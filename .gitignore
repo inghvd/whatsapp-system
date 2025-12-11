@@ -1,34 +1,23 @@
-# Node.js dependencies
+# Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables
+# Bases de datos locales
+*.db
+
+# Variables de entorno
 .env
 
-# Databases (SQLite, LevelDB, etc.)
-*.db
+# Archivos de sesión/cache de whatsapp-web.js
+.wwebjs_auth/
 
 # Logs
 *.log
 logs/
-debug.log
-error.log
 
-# OS files
+# Archivos del sistema
 .DS_Store
 Thumbs.db
-
-# Auth/session data (whatsapp-web.js)
-.wwebjs_auth/
-
-# Cache and temporary files
-.cache/
-tmp/
-*.swp
-
-# Build output
-dist/
-build/
 
