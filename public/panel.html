@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel Vendedor</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .contact-item { font-size: 0.9em; }
+        .action-btn { cursor: pointer; margin-left: 5px; }
+    </style>
+</head>
+<body class="bg-light p-3">
+    <nav class="navbar navbar-light bg-white shadow-sm mb-3 px-3 rounded justify-content-between">
+        <span class="navbar-brand h5">🚀 Panel: <b id="uDisplay"></b></span>
+        <button onclick="logout()" class="btn btn-sm btn-outline-danger">Salir</button>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 1. ESTADO -->
+            <div class="col-md-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header bg-success text-white text-center">Conexión</div>
+                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                        <div id="qrArea"><div class="spinner-border"></div><p>Cargando...</p></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 2. GESTIÓN CONTACTOS -->
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-warning">
+                    <div class="card-header bg-warning">Gestión de Clientes</div>
+                    <div class="card-body">
+                        <!-- Pestañas -->
+                        <ul class="nav nav-tabs mb-2" id="myTab" role="tablist">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#manual">Manual / Editar</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#import">Subir Excel</a></li>
+                        </ul>
+
+                        <div class="tab-content mb-2">
+                            <!-- Manual -->
+                            <div class="tab-pane fade show active" id="manual">
+                                <input type="hidden" id="editId"> <!-- ID oculto para editar -->
+                                <input id="name" class="form-control mb-1 form-control-sm" placeholder="Nombre">
+                                <input id="phone" class="form-control mb-2 form-control-sm" placeholder="Tel (595...)">
+                                <div class="d-flex gap-1">
+                                    <button onclick="saveContact()" id="btnSave" class="btn btn-warning btn-sm w-100">Guardar</button>
+                                    <button onclick="cancelEdit()" id="btnCancel" class="btn btn-secondary btn-sm" style="display:none;">✕</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Importar -->
+                            <div class="tab-pane fade" id="import">
+                                <input type="file" id="fileInput" class="form-control mb-2 form-control-sm" accept=".xlsx, .csv">
+                                <button onclick="uploadFile()" class="btn btn-success btn-sm w-100">📂 Procesar</button>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                            <small class="fw-bold">Agenda: <span id="count">0</span></small>
+                            <button onclick="clearAll()" class="btn btn-outline-danger btn-sm" style="font-size: 0.7rem;">🗑️ Vaciar Agenda</button>
+                        </div>
+                        
+                        <ul id="list" class="list-group mt-2" style="max-height: 250px; overflow: auto;"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. ENVÍO -->
+            <div class="col-md-5">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">Configurar Mensaje</div>
+                    <div class="card-body">
+                        <textarea id="msg" class="form-control mb-2" rows="5" placeholder="Hola {name}, ..."></textarea>
+                        <div class="alert alert-info py-1 px-2 small mb-2">
+                            Usa <b>{name}</b> para el nombre.
+                        </div>
+                        <button onclick="send()" class="btn btn-primary w-100 mb-2">🚀 INICIAR ENVÍO MASIVO</button>
+                        <div class="bg-dark text-white p-2 rounded small" id="logs" style="height: 120px; overflow: auto; font-family: monospace;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const socket = io();
+        document.getElementById('uDisplay').innerText = localStorage.getItem('user');
+        loadContacts();
+
+        // --- GESTIÓN CONTACTOS ---
+
+        async function loadContacts() {
+            const res = await fetch('/my-contacts');
+            if(res.status===403) location.href='/login.html';
+            const data = await res.json();
+            document.getElementById('count').innerText = data.length;
+            
+            const list = document.getElementById('list');
+            list.innerHTML = '';
+            data.forEach(c => {
+                list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center p-1 contact-item">
+                    <span>${c.name} <span class="text-muted">(${c.phone})</span></span>
+                    <div>
+                        <span class="action-btn text-primary" onclick="editMode('${c.id}', '${c.name}', '${c.phone}')">✏️</span>
+                        <span class="action-btn text-danger" onclick="deleteOne('${c.id}')">🗑️</span>
+                    </div>
+                </li>`;
+            });
+        }
+
+        async function saveContact() {
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            
+            let url = '/add-contact';
+            let body = { name, phone };
+
+            if(id) { // Si hay ID, es edición
+                url = '/update-contact';
+                body.id = id;
+            }
+
+            await fetch(url, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(body)
+            });
+            
+            cancelEdit();
+            loadContacts();
+        }
+
+        async function deleteOne(id) {
+            if(!confirm("¿Borrar este contacto?")) return;
+            await fetch('/delete-contact', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ id })
+            });
+            loadContacts();
+        }
+
+        async function clearAll() {
+            if(!confirm("⚠️ ¿ESTÁS SEGURO?\nSe borrarán TODOS los contactos de tu lista para cargar una nueva.")) return;
+            await fetch('/clear-contacts', { method: 'POST' });
+            loadContacts();
+        }
+
+        // --- IMPORTAR CSV ---
+        async function uploadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return alert("Selecciona archivo");
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch('/import-contacts', { method: 'POST', body: formData });
+            const data = await res.json();
+            alert(data.msg || data.error);
+            if(data.msg) loadContacts();
+        }
+
+        // --- HELPERS VISUALES ---
+        function editMode(id, name, phone) {
+            document.getElementById('editId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('btnSave').innerText = "Actualizar";
+            document.getElementById('btnSave').classList.replace('btn-warning', 'btn-info');
+            document.getElementById('btnCancel').style.display = 'inline-block';
+        }
+
+        function cancelEdit() {
+            document.getElementById('editId').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('btnSave').innerText = "Guardar";
+            document.getElementById('btnSave').classList.replace('btn-info', 'btn-warning');
+            document.getElementById('btnCancel').style.display = 'none';
+        }
+
+        // --- ENVÍO ---
+        async function send() {
+            const msg = document.getElementById('msg').value;
+            if(!msg.includes('{name}')) return alert("Se recomienda usar {name} en el mensaje");
+            if(confirm("¿Iniciar Envío Masivo?")) {
+                await fetch('/send-campaign', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({message: msg})
+                });
+            }
+        }
+
+        async function logout() { await fetch('/logout', {method:'POST'}); location.href='/login.html'; }
+
+        // --- SOCKETS ---
+        socket.on('qr', d => document.getElementById('qrArea').innerHTML = `<img src="${d.src}" width="150"><p>Escanea</p>`);
+        socket.on('ready', () => document.getElementById('qrArea').innerHTML = `<h1 class="text-success display-1">✅</h1><p>Conectado</p>`);
+        socket.on('log', d => document.getElementById('logs').innerHTML = `<div>${d.msg}</div>` + document.getElementById('logs').innerHTML);
+    </script>
+</body>
+</html>

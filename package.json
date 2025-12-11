@@ -1,0 +1,22 @@
+{
+  "name": "whatsapp-system",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "pm2": "^6.0.13",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "sqlite3": "^5.1.7",
+    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#main"
+  }
+}

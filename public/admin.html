@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gerencia - Reportes WhatsApp</title>
+    <meta charset="UTF-8">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Librería para exportar a Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-light p-4">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>📊 Panel Gerencial</h2>
+            <div>
+                <a href="/panel.html" class="btn btn-outline-primary me-2">Ir a Operaciones</a>
+                <button onclick="window.location.href='/login.html'" class="btn btn-danger">Salir</button>
+            </div>
+        </div>
+
+        <!-- 1. CREAR USUARIOS -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-primary text-white">👥 Gestión de Equipo</div>
+            <div class="card-body d-flex gap-2 align-items-end">
+                <div class="flex-grow-1">
+                    <label class="small">Usuario Nuevo</label>
+                    <input id="newUser" class="form-control" placeholder="Ej: vendedor1">
+                </div>
+                <div class="flex-grow-1">
+                    <label class="small">Contraseña</label>
+                    <input id="newPass" class="form-control" placeholder="Ej: clave123">
+                </div>
+                <button onclick="createUser()" class="btn btn-success">Crear Usuario</button>
+            </div>
+        </div>
+
+        <!-- 2. REPORTES Y EXPORTACIÓN -->
+        <div class="card shadow-sm border-success">
+            <div class="card-header bg-success text-white">📥 Generador de Reportes (Excel/CSV)</div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="fw-bold">Fecha Inicio:</label>
+                        <input type="date" id="dateStart" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="fw-bold">Fecha Fin:</label>
+                        <input type="date" id="dateEnd" class="form-control">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button onclick="generarReporte()" class="btn btn-dark w-100">🔍 Buscar y Exportar</button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- TABLA DE VISUALIZACIÓN -->
+                <h6>Vista Previa de Datos:</h6>
+                <div style="height: 400px; overflow: auto; border: 1px solid #ccc;">
+                    <table class="table table-striped table-hover table-sm" id="tablaReporte">
+                        <thead class="table-dark" style="position: sticky; top: 0;">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Usuario</th>
+                                <th>Tipo</th>
+                                <th>Detalle del Mensaje</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody">
+                            <tr><td colspan="4" class="text-center text-muted">Selecciona fechas para ver datos</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configurar fechas por defecto (Hoy)
+        document.getElementById('dateStart').valueAsDate = new Date();
+        document.getElementById('dateEnd').valueAsDate = new Date();
+
+        async function createUser() {
+            const u = document.getElementById('newUser').value;
+            const p = document.getElementById('newPass').value;
+            if(!u || !p) return alert("Completa los datos");
+
+            const res = await fetch('/admin/create-user', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const d = await res.json();
+            alert(d.status || d.error);
+            if(d.status) {
+                document.getElementById('newUser').value = '';
+                document.getElementById('newPass').value = '';
+            }
+        }
+
+        async function generarReporte() {
+            const start = document.getElementById('dateStart').value;
+            const end = document.getElementById('dateEnd').value;
+
+            const res = await fetch(`/admin/export-logs?start=${start}&end=${end}`);
+            const logs = await res.json();
+
+            if(logs.length === 0) {
+                alert("No hay movimientos en esas fechas.");
+                return;
+            }
+
+            // 1. Llenar tabla visual
+            const tbody = document.getElementById('tbody');
+            tbody.innerHTML = '';
+            logs.forEach(l => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${new Date(l.timestamp).toLocaleString()}</td>
+                        <td class="fw-bold">${l.username}</td>
+                        <td><span class="badge bg-info text-dark">${l.type}</span></td>
+                        <td class="small text-muted">${l.message}</td>
+                    </tr>`;
+            });
+
+            // 2. Exportar a Excel automáticamente
+            if(confirm(`Se encontraron ${logs.length} registros. ¿Descargar Excel?`)) {
+                descargarExcel(logs);
+            }
+        }
+
+        function descargarExcel(jsonDatos) {
+            // Convertir JSON a Hoja de trabajo
+            const ws = XLSX.utils.json_to_sheet(jsonDatos);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte WhatsApp");
+
+            // Generar archivo
+            const fecha = new Date().toISOString().slice(0,10);
+            XLSX.writeFile(wb, `Reporte_WhatsApp_${fecha}.xlsx`);
+        }
+    </script>
+</body>
+</html>
