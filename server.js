@@ -1,3 +1,4 @@
+// --- Dependencias principales ---
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -9,23 +10,29 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
+// --- Inicialización de servidor ---
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const PORT = 3034;
 
+// 🔧 Puerto dinámico para Render, fijo 3034 en local
+const PORT = process.env.PORT || 3034;
+
+// --- Configuración de subida de archivos en memoria ---
 const upload = multer({ storage: multer.memoryStorage() });
 
+// --- Middlewares ---
 app.use(express.json());
 app.use(express.static('public'));
 app.use(session({
-    secret: 'secreto_empresa_2025',
+    // 🔧 Secret dinámico desde variable de entorno
+    secret: process.env.SESSION_SECRET || 'secreto_empresa_2025',
     resave: false,
     saveUninitialized: true,
     cookie: { maxAge: 3600000 }
 }));
 
-// --- WHATSAPP ---
+// --- Cliente WhatsApp ---
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -34,11 +41,13 @@ const client = new Client({
     }
 });
 
+// Generación de QR
 client.on('qr', (qr) => {
     console.log('📲 QR GENERADO');
     QRCode.toDataURL(qr, (err, url) => io.emit('qr', { src: url }));
 });
 
+// Conexión lista
 client.on('ready', () => {
     console.log('✅ WHATSAPP CONECTADO');
     io.emit('ready', { status: 'Conectado' });
@@ -46,7 +55,7 @@ client.on('ready', () => {
 
 client.initialize();
 
-// --- AUTH ---
+// --- Autenticación ---
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     db.get("SELECT * FROM users WHERE username = ?", [username], (err, user) => {
@@ -65,14 +74,13 @@ app.post('/logout', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Middleware de auth
 const auth = (req, res, next) => {
     if (!req.session.userId) return res.status(403).json({ error: "Sesión expirada" });
     next();
 };
 
-// --- GESTIÓN DE CONTACTOS (CRUD COMPLETO) ---
-
-// 1. Agregar / Crear
+// --- CRUD de Contactos ---
 app.post('/add-contact', auth, (req, res) => {
     const { name, phone } = req.body;
     const cleanPhone = phone.replace(/\D/g, '');
@@ -81,7 +89,6 @@ app.post('/add-contact', auth, (req, res) => {
         (err) => res.json(err ? { error: err.message } : { status: 'Guardado' }));
 });
 
-// 2. Editar Contacto (NUEVO)
 app.post('/update-contact', auth, (req, res) => {
     const { id, name, phone } = req.body;
     const cleanPhone = phone.replace(/\D/g, '');
@@ -90,7 +97,6 @@ app.post('/update-contact', auth, (req, res) => {
         (err) => res.json(err ? { error: err.message } : { status: 'Actualizado' }));
 });
 
-// 3. Borrar UN Contacto (NUEVO)
 app.post('/delete-contact', auth, (req, res) => {
     const { id } = req.body;
     db.run("DELETE FROM contacts WHERE id = ? AND user_id = ?", 
@@ -98,13 +104,12 @@ app.post('/delete-contact', auth, (req, res) => {
         (err) => res.json(err ? { error: err.message } : { status: 'Eliminado' }));
 });
 
-// 4. Vaciar Agenda Completa (NUEVO)
 app.post('/clear-contacts', auth, (req, res) => {
     db.run("DELETE FROM contacts WHERE user_id = ?", [req.session.userId], 
         (err) => res.json(err ? { error: err.message } : { status: 'Limpiado' }));
 });
 
-// 5. Importar CSV Mejorado
+// Importar contactos desde Excel/CSV
 app.post('/import-contacts', auth, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "Falta archivo" });
 
@@ -119,10 +124,8 @@ app.post('/import-contacts', auth, upload.single('file'), (req, res) => {
         db.serialize(() => {
             const stmt = db.prepare("INSERT OR IGNORE INTO contacts (user_id, phone, name) VALUES (?, ?, ?)");
             data.forEach(row => {
-                if (row[0]) { // Columna A: Teléfono
+                if (row[0]) {
                     let cleanPhone = String(row[0]).replace(/\D/g, '');
-                    // Columna B: Nombre (Si no existe, usa "Cliente")
-                    // Esto evita que {name} quede vacío
                     let name = row[1] ? String(row[1]) : "Cliente"; 
                     
                     if (cleanPhone.length > 6) {
@@ -141,7 +144,7 @@ app.get('/my-contacts', auth, (req, res) => {
     db.all("SELECT * FROM contacts WHERE user_id = ?", [req.session.userId], (err, rows) => res.json(rows || []));
 });
 
-// --- ENVÍO MASIVO ---
+// --- Envío masivo ---
 app.post('/send-campaign', auth, (req, res) => {
     const { message } = req.body;
     const { userId, username } = req.session;
@@ -156,7 +159,6 @@ app.post('/send-campaign', auth, (req, res) => {
         for(const row of rows) {
             try {
                 const chatId = `${row.phone}@c.us`;
-                // Si el contacto se llama "Cliente", el mensaje será "Hola Cliente"
                 const finalMsg = message.replace('{name}', row.name);
                 
                 await client.sendMessage(chatId, finalMsg);
@@ -175,7 +177,7 @@ app.post('/send-campaign', auth, (req, res) => {
     });
 });
 
-// --- ADMIN ---
+// --- Administración ---
 app.post('/admin/create-user', auth, (req, res) => {
     if(req.session.role !== 'admin') return res.status(403).json({ error: "Acceso Denegado" });
     const hash = bcrypt.hashSync(req.body.password, 10);
@@ -190,4 +192,6 @@ app.get('/admin/export-logs', auth, (req, res) => {
         [start, end], (err, rows) => res.json(rows));
 });
 
+// --- Inicio del servidor ---
 server.listen(PORT, () => console.log(`🔥 SISTEMA V2.0 LISTO EN PUERTO ${PORT}`));
+
