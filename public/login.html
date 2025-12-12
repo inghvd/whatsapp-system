@@ -10,18 +10,19 @@
         <input id="user" class="form-control mb-2" placeholder="Usuario">
         <input id="pass" type="password" class="form-control mb-3" placeholder="Contraseña">
         <button onclick="login()" class="btn btn-primary w-100">Ingresar</button>
-        <div class="text-muted small text-center mt-3">Admin Default: admin / 1234</div>
     </div>
+
     <script>
         async function login() {
             const u = document.getElementById('user').value;
             const p = document.getElementById('pass').value;
             const res = await fetch('/login', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: u, password: p })
             });
             const data = await res.json();
-            if(data.role) {
+            if (data.role) {
                 localStorage.setItem('user', data.username);
                 localStorage.setItem('role', data.role);
                 window.location.href = data.role === 'admin' ? '/admin.html' : '/panel.html';
@@ -32,3 +33,4 @@
     </script>
 </body>
 </html>
+
