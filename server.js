@@ -216,13 +216,10 @@ app.post('/clear-contacts', auth, async (req, res) => {
   }
 });
 
+// --- Importar contactos (xlsx/csv) ---
 app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Falta archivo' });
     const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = xlsx.utils.sheet_to_json(sheet);
-    let count = 0;
-    for (const r of rows) {
-      const name = (r.Nombre || r.name || '').trim();
-      const phone = String(r
+    const rows = xlsx.utils.sheet_to_json(sheet
