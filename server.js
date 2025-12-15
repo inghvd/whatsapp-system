@@ -8,7 +8,7 @@ const { Server } = require('socket.io');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');   // ✅ Store persistente
+const MongoStore = require('connect-mongo');   // ✅ Store persistente v4
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const xlsx = require('xlsx');
@@ -27,10 +27,8 @@ if (!process.env.DB_URL) {
   console.error('❌ Falta la variable DB_URL');
   process.exit(1);
 }
-mongoose.connect(process.env.DB_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log('💾 MongoDB Atlas Conectado'))
+mongoose.connect(process.env.DB_URL)
+  .then(() => console.log('💾 MongoDB Atlas Conectado'))
   .catch(err => {
     console.error('❌ Error MongoDB:', err);
     process.exit(1);
@@ -81,30 +79,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// --- 9) Sesiones con MongoStore (no MemoryStore) ---
-try {
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'secreto_empresa_2025',
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.DB_URL,
-      ttl: 24 * 60 * 60,
-      collectionName: 'sessions'
-    }),
-    cookie: {
-      maxAge: 3600000, // 1 hora
-      secure: false // Render hace terminación TLS; false funciona bien
-    }
-  }));
-  console.log('🔐 SessionStore: MongoStore configurado');
-} catch (e) {
-  console.error('❌ Error configurando MongoStore:', e);
-}
+// --- 9) Sesiones con MongoStore v4 ---
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'secreto_empresa_2025',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.DB_URL,
+    ttl: 24 * 60 * 60,
+    collectionName: 'sessions'
+  }),
+  cookie: {
+    maxAge: 3600000, // 1 hora
+    secure: false    // Render maneja TLS, false funciona bien
+  }
+}));
+console.log('🔐 SessionStore: MongoStore v4 configurado');
 
 // --- 10) Cliente WhatsApp y eventos ---
 const client = new Client({
-  authStrategy: new LocalAuth(), // guarda sesión local en .wwebjs_auth
+  authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
@@ -184,7 +178,6 @@ app.get('/my-contacts', auth, async (req, res) => {
   }
 });
 
-// Editar contacto
 app.post('/update-contact', auth, async (req, res) => {
   try {
     const { id, name, phone } = req.body || {};
@@ -201,7 +194,6 @@ app.post('/update-contact', auth, async (req, res) => {
   }
 });
 
-// Borrar contacto
 app.post('/delete-contact', auth, async (req, res) => {
   try {
     const { id } = req.body || {};
@@ -214,7 +206,6 @@ app.post('/delete-contact', auth, async (req, res) => {
   }
 });
 
-// Vaciar contactos del usuario
 app.post('/clear-contacts', auth, async (req, res) => {
   try {
     await Contact.deleteMany({ userId: req.session.userId });
@@ -225,7 +216,6 @@ app.post('/clear-contacts', auth, async (req, res) => {
   }
 });
 
-// Importar contactos (xlsx/csv)
 app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Falta archivo' });
@@ -235,89 +225,4 @@ app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
     let count = 0;
     for (const r of rows) {
       const name = (r.Nombre || r.name || '').trim();
-      const phone = String(r.Tel || r.phone || '').replace(/\D/g, '');
-      if (!phone) continue;
-      try {
-        await Contact.create({ userId: req.session.userId, phone, name: name || 'Cliente' });
-        count++;
-      } catch (e) {
-        // Ignorar duplicados
-        if (e.code !== 11000) console.error('❌ Error fila import:', e);
-      }
-    }
-    res.json({ msg: `Importados ${count} contactos` });
-  } catch (e) {
-    console.error('❌ Error import-contacts:', e);
-    res.status(500).json({ error: 'Error interno' });
-  }
-});
-
-// --- 13) Envío masivo ---
-app.post('/send-campaign', auth, async (req, res) => {
-  try {
-    const { message } = req.body || {};
-    const { userId, username } = req.session;
-    if (!message) return res.status(400).json({ msg: 'Falta mensaje' });
-    if (!client.info) return res.status(400).json({ msg: '❌ WhatsApp desconectado.' });
-
-    const contacts = await Contact.find({ userId });
-    if (!contacts.length) return res.json({ msg: 'Agenda vacía.' });
-
-    res.json({ msg: `🚀 Enviando a ${contacts.length} contactos...` });
-
-    for (const row of contacts) {
-      try {
-        const chatId = `${row.phone}@c.us`;
-        const finalMsg = message.replace('{name}', row.name || 'Cliente');
-        await client.sendMessage(chatId, finalMsg);
-        await Log.create({ userId, username, type: 'ENVIO', message: `A: ${row.phone}` });
-        io.emit('log', { msg: `✅ Enviado a ${row.phone}` });
-        await new Promise(r => setTimeout(r, Math.floor(Math.random() * 3000) + 4000));
-      } catch (e) {
-        io.emit('log', { msg: `❌ Error con ${row.phone}` });
-      }
-    }
-  } catch (e) {
-    console.error('❌ Error send-campaign:', e);
-    res.status(500).json({ msg: 'Error interno' });
-  }
-});
-
-// --- 14) Administración de usuarios ---
-app.post('/admin/create-user', auth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') {
-      console.log('❌ Acceso denegado: no es admin');
-      return res.status(403).json({ error: 'Acceso Denegado' });
-    }
-    const { username, password, role } = req.body || {};
-    console.log('📥 Intentando crear usuario:', username, role);
-    if (!username || !password) return res.status(400).json({ error: 'Faltan datos' });
-
-    const exists = await User.findOne({ username });
-    if (exists) return res.json({ error: 'Usuario existe' });
-
-    const hash = bcrypt.hashSync(password, 10);
-    const nuevo = await User.create({ username, password: hash, role: role || 'agent' });
-    console.log('✅ Usuario creado en MongoDB:', nuevo.username);
-    res.json({ status: 'Creado' });
-  } catch (e) {
-    console.error('❌ Error create-user:', e);
-    res.status(500).json({ error: 'Error interno' });
-  }
-});
-
-app.get('/admin/users', auth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin') return res.status(403).json({ error: 'Acceso Denegado' });
-    const users = await User.find({}, 'username role');
-    res.json(users);
-  } catch (e) {
-    console.error('❌ Error admin/users:', e);
-    res.status(500).json({ error: 'Error interno' });
-  }
-});
-
-// --- 15) Inicio del servidor ---
-server.listen(PORT, () => console.log(`🔥 SISTEMA V2.0 LISTO EN PUERTO ${PORT}`));
-
+      const phone = String(r
