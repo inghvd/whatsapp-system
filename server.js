@@ -76,9 +76,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'secreto_empresa_2025',
   resave: false,
   saveUninitialized: false,
-  store: new MongoStore({       // 🔧 CORREGIDO: usar constructor
+  store: MongoStore.create({       // ✅ API correcta
     mongoUrl: process.env.DB_URL,
-    ttl: 24 * 60 * 60
+    ttl: 24 * 60 * 60,
+    collectionName: 'sessions'
   }),
   cookie: { maxAge: 3600000 }
 }));
