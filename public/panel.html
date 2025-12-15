@@ -7,6 +7,7 @@
     <style>
         .contact-item { font-size: 0.9em; }
         .action-btn { cursor: pointer; margin-left: 5px; }
+        .table-sm td, .table-sm th { padding: .4rem; }
     </style>
 </head>
 <body class="bg-light p-3">
@@ -22,7 +23,7 @@
                 <div class="card h-100 shadow-sm">
                     <div class="card-header bg-success text-white text-center">Conexión</div>
                     <div class="card-body text-center d-flex flex-column justify-content-center">
-                        <div id="qrArea"><div class="spinner-border"></div><p>Cargando...</p></div>
+                        <div id="qrArea"><div class="spinner-border"></div><p class="mt-2">Cargando...</p></div>
                     </div>
                 </div>
             </div>
@@ -41,7 +42,7 @@
                         <div class="tab-content mb-2">
                             <!-- Manual -->
                             <div class="tab-pane fade show active" id="manual">
-                                <input type="hidden" id="editId"> <!-- ID oculto para editar -->
+                                <input type="hidden" id="editId">
                                 <input id="name" class="form-control mb-1 form-control-sm" placeholder="Nombre">
                                 <input id="phone" class="form-control mb-2 form-control-sm" placeholder="Tel (595...)">
                                 <div class="d-flex gap-1">
@@ -52,7 +53,7 @@
                             
                             <!-- Importar -->
                             <div class="tab-pane fade" id="import">
-                                <input type="file" id="fileInput" class="form-control mb-2 form-control-sm" accept=".xlsx, .csv">
+                                <input type="file" id="fileInput" class="form-control mb-2 form-control-sm" accept=".xlsx,.csv">
                                 <button onclick="uploadFile()" class="btn btn-success btn-sm w-100">📂 Procesar</button>
                             </div>
                         </div>
@@ -74,10 +75,10 @@
                     <div class="card-body">
                         <textarea id="msg" class="form-control mb-2" rows="5" placeholder="Hola {name}, ..."></textarea>
                         <div class="alert alert-info py-1 px-2 small mb-2">
-                            Usa <b>{name}</b> para el nombre.
+                            Usa <b>{name}</b> para personalizar con el nombre.
                         </div>
                         <button onclick="send()" class="btn btn-primary w-100 mb-2">🚀 INICIAR ENVÍO MASIVO</button>
-                        <div class="bg-dark text-white p-2 rounded small" id="logs" style="height: 120px; overflow: auto; font-family: monospace;"></div>
+                        <div class="bg-dark text-white p-2 rounded small" id="logs" style="height: 140px; overflow: auto; font-family: monospace;"></div>
                     </div>
                 </div>
             </div>
@@ -96,7 +97,7 @@
                             <option value="admin">Admin</option>
                         </select>
                         <button onclick="crearUsuario()" class="btn btn-info w-100 mb-2">➕ Crear Usuario</button>
-                        <div id="userMsg" class="small text-muted"></div>
+                        <div id="userMsg" class="small"></div>
                     </div>
                 </div>
             </div>
@@ -117,20 +118,23 @@
         </div>
     </div>
 
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Lógica del panel -->
     <script>
         const socket = io();
-        document.getElementById('uDisplay').innerText = localStorage.getItem('user');
+        document.getElementById('uDisplay').innerText = localStorage.getItem('user') || '';
+
         loadContacts();
         listarUsuarios();
 
-        // --- GESTIÓN CONTACTOS ---
+        // --- CONTACTOS ---
         async function loadContacts() {
             const res = await fetch('/my-contacts');
             if(res.status===403) location.href='/login.html';
             const data = await res.json();
             document.getElementById('count').innerText = data.length;
-            
             const list = document.getElementById('list');
             list.innerHTML = '';
             data.forEach(c => {
@@ -149,42 +153,26 @@
             const id = document.getElementById('editId').value;
             const name = document.getElementById('name').value;
             const phone = document.getElementById('phone').value;
-            
             let url = '/add-contact';
             let body = { name, phone };
-
-            if(id) { // Si hay ID, es edición
-                url = '/update-contact';
-                body.id = id;
-            }
-
-            await fetch(url, {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify(body)
-            });
-            
-            cancelEdit();
-            loadContacts();
+            if(id) { url = '/update-contact'; body.id = id; }
+            await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+            cancelEdit(); loadContacts();
         }
 
         async function deleteOne(id) {
             if(!confirm("¿Borrar este contacto?")) return;
-            await fetch('/delete-contact', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ id })
-            });
+            await fetch('/delete-contact', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
             loadContacts();
         }
 
         async function clearAll() {
-            if(!confirm("⚠️ ¿ESTÁS SEGURO?\nSe borrarán TODOS los contactos de tu lista para cargar una nueva.")) return;
+            if(!confirm("⚠️ ¿Vaciar toda la agenda?")) return;
             await fetch('/clear-contacts', { method: 'POST' });
             loadContacts();
         }
 
-        // --- IMPORTAR CSV ---
         async function uploadFile() {
             const file = document.getElementById('fileInput').files[0];
             if (!file) return alert("Selecciona archivo");
-            const formData = new FormData();
-            formData.append('file
+            const formData = new
