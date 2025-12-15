@@ -171,6 +171,12 @@ app.post('/admin/create-user', auth, async (req, res) => {
   res.json({ status: 'Creado' });
 });
 
+app.get('/admin/users', auth, async (req, res) => {
+  if (req.session.role !== 'admin') return res.status(403).json({ error: 'Acceso Denegado' });
+  const users = await User.find({}, 'username role');
+  res.json(users);
+});
+
 // --- Inicio del servidor ---
 server.listen(PORT, () => console.log(`🔥 SISTEMA V2.0 LISTO EN PUERTO ${PORT}`));
 
