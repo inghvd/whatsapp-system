@@ -222,4 +222,8 @@ app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Falta archivo' });
     const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = xlsx.utils.sheet_to_json(sheet
+    const rows = xlsx.utils.sheet_to_json(sheet);
+    let count = 0;
+
+    for (const r of rows) {
+      const name
