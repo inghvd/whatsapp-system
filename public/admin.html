@@ -11,7 +11,8 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>📊 Panel Gerencial</h2>
             <div>
-                <a href="/panel.html" class="btn btn-outline-primary me-2">Ir a Operaciones</a>
+                <!-- BOTÓN CORREGIDO: ahora sí funciona siempre -->
+                <button onclick="window.location.href='/panel.html'" class="btn btn-outline-primary me-2">Ir a Operaciones</button>
                 <button onclick="window.location.href='/login.html'" class="btn btn-danger">Salir</button>
             </div>
         </div>
@@ -37,14 +38,14 @@
             <div class="card-header bg-info text-white">Usuarios Registrados</div>
             <div class="card-body">
                 <table class="table table-sm table-hover">
-                    <thead>
+                    <thead class="table-light">
                         <tr>
                             <th>Usuario</th>
                             <th>Rol</th>
                         </tr>
                     </thead>
                     <tbody id="userList">
-                        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
+                        <tr><td colspan="2" class="text-center text-muted">Cargando usuarios...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -89,32 +90,37 @@
     </div>
 
     <script>
+        // Fecha por defecto: hoy
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('dateStart').value = today;
         document.getElementById('dateEnd').value = today;
 
-        // Cargar usuarios al abrir
+        // Cargar lista de usuarios
         async function loadUsers() {
             try {
                 const res = await fetch('/admin/get-users');
                 const d = await res.json();
-                if (d.success) {
-                    const tbody = document.getElementById('userList');
-                    tbody.innerHTML = '';
+                const tbody = document.getElementById('userList');
+                tbody.innerHTML = '';
+                if (d.success && d.users && d.users.length > 0) {
                     d.users.forEach(u => {
-                        tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.role}</td></tr>`;
+                        tbody.innerHTML += `<tr><td><b>${u.username}</b></td><td>${u.role}</td></tr>`;
                     });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No hay usuarios registrados</td></tr>';
                 }
             } catch (err) {
+                document.getElementById('userList').innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error al cargar usuarios</td></tr>';
                 console.error(err);
             }
         }
         loadUsers();
 
+        // Crear usuario
         async function createUser() {
             const u = document.getElementById('newUser').value.trim();
             const p = document.getElementById('newPass').value;
-            if (!u || !p) return alert("Completa ambos campos");
+            if (!u || !p) return alert("⚠️ Completa usuario y contraseña");
 
             try {
                 const res = await fetch('/admin/create-user', {
@@ -123,21 +129,23 @@
                     body: JSON.stringify({ username: u, password: p })
                 });
                 const d = await res.json();
-                alert(d.success ? "✅ " + d.message : "❌ " + (d.error || "Error"));
+                alert(d.success ? "✅ " + d.message : "❌ " + (d.error || "Error al crear usuario"));
                 if (d.success) {
                     document.getElementById('newUser').value = '';
                     document.getElementById('newPass').value = '';
                     loadUsers();
                 }
             } catch (err) {
-                alert("Error de conexión");
+                alert("❌ Error de conexión");
+                console.error(err);
             }
         }
 
+        // Generar reporte
         async function generarReporte() {
             const start = document.getElementById('dateStart').value;
             const end = document.getElementById('dateEnd').value;
-            if (!start || !end) return alert("Selecciona ambas fechas");
+            if (!start || !end) return alert("⚠️ Selecciona ambas fechas");
 
             try {
                 const res = await fetch(`/admin/export-logs?start=${start}&end=${end}`);
@@ -162,11 +170,11 @@
                         </tr>`;
                 });
 
-                if (confirm(`✅ ${logs.length} registros encontrados.\n¿Descargar Excel?`)) {
+                if (confirm(`✅ ${logs.length} registros encontrados.\n¿Descargar Excel ahora?`)) {
                     descargarExcel(logs);
                 }
             } catch (err) {
-                alert("Error al cargar datos");
+                alert("❌ Error al cargar reportes");
                 console.error(err);
             }
         }
