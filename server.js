@@ -1,5 +1,5 @@
 // --- 0) Variables de entorno ---
-require('dotenv').config(); // ✅ Carga .env en local
+require('dotenv').config();
 
 // --- 1) Dependencias principales ---
 const express = require('express');
@@ -15,17 +15,16 @@ const xlsx = require('xlsx');
 const mongoose = require('mongoose');
 const path = require('path');
 
-// --- 2) Inicialización de servidor y sockets ---
+// --- 2) Inicialización ---
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// --- 3) Puerto dinámico (Render) o 3034 local ---
 const PORT = process.env.PORT || 3034;
 
-// --- 4) Validación y conexión a MongoDB Atlas ---
+// --- 4) Conexión MongoDB ---
 if (!process.env.DB_URL) {
-  console.error('❌ Falta la variable DB_URL');
+  console.error('❌ Falta DB_URL');
   process.exit(1);
 }
 
@@ -36,7 +35,7 @@ mongoose.connect(process.env.DB_URL)
     process.exit(1);
   });
 
-// --- 5) Modelos (Mongoose) Mejorados ---
+// --- 5) Modelos ---
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true, index: true },
   password: { type: String, required: true },
@@ -63,29 +62,29 @@ const User = mongoose.model('User', userSchema);
 const Contact = mongoose.model('Contact', contactSchema);
 const Log = mongoose.model('Log', logSchema);
 
-// --- 6) Semilla de admin por defecto (temporal, cámbiala después) ---
+// --- 6) Admin inicial ---
 (async () => {
   try {
     const admin = await User.findOne({ username: 'admin' });
     if (!admin) {
       const hash = bcrypt.hashSync('1234', 10);
       await User.create({ username: 'admin', password: hash, role: 'admin' });
-      console.log('👤 Usuario admin inicial creado (cambia la contraseña ASAP)');
+      console.log('👤 Admin inicial creado (cambia contraseña pronto)');
     }
   } catch (e) {
-    console.error('❌ Error creando admin inicial:', e);
+    console.error('Error creando admin:', e);
   }
 })();
 
-// --- 7) Configuración de subida de archivos ---
+// --- 7) Multer ---
 const upload = multer({ storage: multer.memoryStorage() });
 
-// --- 8) Middlewares generales ---
+// --- 8) Middlewares ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- 9) Sesiones con MongoStore v4 ---
+// --- 9) Sesiones ---
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secreto_empresa_2025',
   resave: false,
@@ -95,14 +94,11 @@ app.use(session({
     ttl: 24 * 60 * 60,
     collectionName: 'sessions'
   }),
-  cookie: {
-    maxAge: 3600000,
-    secure: false // Render maneja HTTPS
-  }
+  cookie: { maxAge: 3600000, secure: false }
 }));
-console.log('🔐 SessionStore: MongoStore v4 configurado');
+console.log('🔐 SessionStore configurado');
 
-// --- 10) Cliente WhatsApp y eventos ---
+// --- 10) WhatsApp Client ---
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -125,7 +121,7 @@ client.on('ready', () => {
 
 client.initialize();
 
-// --- 11) Autenticación y middlewares ---
+// --- 11) Login/Logout ---
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
@@ -139,7 +135,7 @@ app.post('/login', async (req, res) => {
     req.session.role = user.role;
     res.json({ role: user.role, username: user.username });
   } catch (e) {
-    console.error('❌ Error /login:', e);
+    console.error('Error login:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });
@@ -148,30 +144,21 @@ app.post('/logout', (req, res) => {
   req.session.destroy(() => res.json({ status: 'ok' }));
 });
 
-const auth = (req, res, next) =>
-  !req.session.userId ? res.status(403).json({ error: 'Sesión expirada' }) : next();
-
+const auth = (req, res, next) => !req.session.userId ? res.status(403).json({ error: 'Sesión expirada' }) : next();
 const adminAuth = (req, res, next) => {
   if (!req.session.userId || req.session.role !== 'admin') {
-    return res.status(403).json({ error: 'Acceso denegado: solo admin' });
+    return res.status(403).json({ error: 'Solo admin' });
   }
   next();
 };
 
-// --- 12) CRUD de Contactos (agentes) ---
-// ← Mantén aquí todas tus rutas originales de contactos (add-contact, my-contacts, etc.)
-
-// --- 13) RUTAS DEL PANEL ADMIN ---
+// --- 12) RUTAS ADMIN (CORREGIDAS Y COMPLETAS) ---
 app.post('/admin/create-user', adminAuth, async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Faltan datos' });
-    }
-    const exists = await User.findOne({ username });
-    if (exists) {
-      return res.status(400).json({ error: 'Usuario ya existe' });
-    }
+    if (!username || !password) return res.status(400).json({ error: 'Faltan datos' });
+    if (await User.findOne({ username })) return res.status(400).json({ error: 'Usuario ya existe' });
+
     const hash = bcrypt.hashSync(password, 10);
     await User.create({ username, password: hash, role: 'agent' });
 
@@ -183,7 +170,7 @@ app.post('/admin/create-user', adminAuth, async (req, res) => {
 
     res.json({ success: true, message: 'Usuario creado correctamente' });
   } catch (e) {
-    console.error('❌ Error /admin/create-user:', e);
+    console.error('Error create-user:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });
@@ -193,62 +180,58 @@ app.get('/admin/get-users', adminAuth, async (req, res) => {
     const users = await User.find({}, 'username role -_id');
     res.json({ success: true, users });
   } catch (e) {
-    console.error('❌ Error /admin/get-users:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Error' });
   }
 });
 
 app.post('/admin/delete-user', adminAuth, async (req, res) => {
   try {
     const { username } = req.body;
-    if (!username || username === 'admin') {
-      return res.status(400).json({ error: 'No puedes eliminar al admin principal' });
-    }
+    if (!username || username === 'admin') return res.status(400).json({ error: 'No permitido' });
+
     const result = await User.deleteOne({ username, role: 'agent' });
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'No encontrado' });
 
     await Log.create({
       username: req.session.username,
       type: 'admin',
-      message: `Eliminó usuario agente: ${username}`
+      message: `Eliminó usuario: ${username}`
     });
 
-    res.json({ success: true, message: 'Usuario eliminado correctamente' });
+    res.json({ success: true, message: 'Usuario eliminado' });
   } catch (e) {
-    console.error('❌ Error /admin/delete-user:', e);
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: 'Error' });
   }
 });
 
-// Generador de reportes para admin.html
+// --- REPORTE CORREGIDO (zona horaria local) ---
 app.get('/admin/export-logs', adminAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
     let query = {};
 
     if (start && end) {
-      query.timestamp = {
-        $gte: new Date(start + 'T00:00:00Z'),
-        $lte: new Date(end + 'T23:59:59Z')
-      };
+      const startDate = new Date(start);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+
+      query.timestamp = { $gte: startDate, $lte: endDate };
     }
 
     const logs = await Log.find(query).sort({ timestamp: -1 }).lean();
     res.json(logs);
   } catch (e) {
-    console.error('❌ Error /admin/export-logs:', e);
-    res.status(500).json({ error: 'Error interno' });
+    console.error('Error export-logs:', e);
+    res.status(500).json([]);
   }
 });
 
-// --- 14) Salud del servicio ---
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', mongo: mongoose.connection.readyState });
-});
+// --- 14) Health ---
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// --- 15) Arranque del servidor ---
+// --- 15) Listen ---
 server.listen(PORT, () => {
-  console.log(`🔥 SISTEMA V2.0 LISTO EN PUERTO ${PORT}`);
+  console.log(`🔥 SISTEMA LISTO EN PUERTO ${PORT}`);
 });
