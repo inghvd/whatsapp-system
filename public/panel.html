@@ -15,7 +15,6 @@
         <span class="navbar-brand h5">🚀 Panel: <b id="uDisplay"></b></span>
         <button onclick="logout()" class="btn btn-sm btn-outline-danger">Salir</button>
     </nav>
-
     <div class="container-fluid">
         <div class="row">
             <!-- 1. ESTADO -->
@@ -27,7 +26,7 @@
                     </div>
                 </div>
             </div>
-            
+           
             <!-- 2. GESTIÓN CONTACTOS -->
             <div class="col-md-4">
                 <div class="card h-100 shadow-sm border-warning">
@@ -38,7 +37,6 @@
                             <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#manual">Manual / Editar</a></li>
                             <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#import">Subir Excel</a></li>
                         </ul>
-
                         <div class="tab-content mb-2">
                             <!-- Manual -->
                             <div class="tab-pane fade show active" id="manual">
@@ -50,24 +48,22 @@
                                     <button onclick="cancelEdit()" id="btnCancel" class="btn btn-secondary btn-sm" style="display:none;">✕</button>
                                 </div>
                             </div>
-                            
+                           
                             <!-- Importar -->
                             <div class="tab-pane fade" id="import">
                                 <input type="file" id="fileInput" class="form-control mb-2 form-control-sm" accept=".xlsx,.csv">
                                 <button onclick="uploadFile()" class="btn btn-success btn-sm w-100">📂 Procesar</button>
                             </div>
                         </div>
-
                         <div class="d-flex justify-content-between align-items-center border-top pt-2">
                             <small class="fw-bold">Agenda: <span id="count">0</span></small>
                             <button onclick="clearAll()" class="btn btn-outline-danger btn-sm" style="font-size: 0.7rem;">🗑️ Vaciar Agenda</button>
                         </div>
-                        
+                       
                         <ul id="list" class="list-group mt-2" style="max-height: 250px; overflow: auto;"></ul>
                     </div>
                 </div>
             </div>
-
             <!-- 3. ENVÍO -->
             <div class="col-md-5">
                 <div class="card h-100 shadow-sm border-primary">
@@ -83,51 +79,16 @@
                 </div>
             </div>
         </div>
-
-        <!-- 4. GESTIÓN DE USUARIOS -->
-        <div class="row mt-3">
-            <div class="col-md-6">
-                <div class="card shadow-sm border-info">
-                    <div class="card-header bg-info text-white">Gestión de Usuarios</div>
-                    <div class="card-body">
-                        <input id="newUser" class="form-control mb-1" placeholder="Usuario">
-                        <input id="newPass" type="password" class="form-control mb-2" placeholder="Contraseña">
-                        <select id="newRole" class="form-select mb-2">
-                            <option value="agent">Agente</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                        <button onclick="crearUsuario()" class="btn btn-info w-100 mb-2">➕ Crear Usuario</button>
-                        <div id="userMsg" class="small"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card shadow-sm border-secondary">
-                    <div class="card-header bg-secondary text-white">Usuarios Registrados</div>
-                    <div class="card-body p-0">
-                        <table class="table table-sm mb-0">
-                            <thead class="table-light">
-                                <tr><th>Usuario</th><th>Rol</th></tr>
-                            </thead>
-                            <tbody id="userTable"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Lógica del panel -->
+    <!-- Lógica del panel (tu código original) -->
     <script>
         const socket = io();
         document.getElementById('uDisplay').innerText = localStorage.getItem('user') || '';
-
         loadContacts();
-        listarUsuarios();
 
         // --- CONTACTOS ---
         async function loadContacts() {
@@ -160,6 +121,22 @@
             cancelEdit(); loadContacts();
         }
 
+        function editMode(id, name, phone) {
+            document.getElementById('editId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('btnSave').innerText = 'Actualizar';
+            document.getElementById('btnCancel').style.display = 'inline-block';
+        }
+
+        function cancelEdit() {
+            document.getElementById('editId').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('btnSave').innerText = 'Guardar';
+            document.getElementById('btnCancel').style.display = 'none';
+        }
+
         async function deleteOne(id) {
             if(!confirm("¿Borrar este contacto?")) return;
             await fetch('/delete-contact', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
@@ -175,4 +152,20 @@
         async function uploadFile() {
             const file = document.getElementById('fileInput').files[0];
             if (!file) return alert("Selecciona archivo");
-            const formData = new
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch('/import-contacts', { method: 'POST', body: formData });
+            loadContacts();
+        }
+
+        function logout() {
+            fetch('/logout', { method: 'POST' });
+            localStorage.clear();
+            location.href = '/login.html';
+        }
+
+        // Tu código de WhatsApp (QR, envío masivo, logs, etc.) va aquí
+        // (pégalo tal cual lo tenías antes)
+    </script>
+</body>
+</html>
