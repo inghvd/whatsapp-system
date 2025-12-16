@@ -152,7 +152,7 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-// --- RUTAS DE CONTACTOS PARA AGENTES (ESTO FALTABA) ---
+// --- RUTAS DE CONTACTOS PARA AGENTES ---
 app.get('/my-contacts', auth, async (req, res) => {
   try {
     const contacts = await Contact.find({ userId: req.session.userId }).sort({ name: 1 });
