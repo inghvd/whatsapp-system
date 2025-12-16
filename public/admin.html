@@ -32,6 +32,24 @@
             </div>
         </div>
 
+        <!-- LISTA DE USUARIOS -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-info text-white">Usuarios Registrados</div>
+            <div class="card-body">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userList">
+                        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- REPORTES -->
         <div class="card shadow-sm border-success">
             <div class="card-header bg-success text-white">📥 Generador de Reportes (Excel)</div>
@@ -71,15 +89,32 @@
     </div>
 
     <script>
-        // Fecha por defecto: hoy
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('dateStart').value = today;
         document.getElementById('dateEnd').value = today;
 
+        // Cargar usuarios al abrir
+        async function loadUsers() {
+            try {
+                const res = await fetch('/admin/get-users');
+                const d = await res.json();
+                if (d.success) {
+                    const tbody = document.getElementById('userList');
+                    tbody.innerHTML = '';
+                    d.users.forEach(u => {
+                        tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.role}</td></tr>`;
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        loadUsers();
+
         async function createUser() {
             const u = document.getElementById('newUser').value.trim();
             const p = document.getElementById('newPass').value;
-            if (!u || !p) return alert("⚠️ Completa ambos campos");
+            if (!u || !p) return alert("Completa ambos campos");
 
             try {
                 const res = await fetch('/admin/create-user', {
@@ -92,16 +127,17 @@
                 if (d.success) {
                     document.getElementById('newUser').value = '';
                     document.getElementById('newPass').value = '';
+                    loadUsers();
                 }
             } catch (err) {
-                alert("❌ Error de conexión");
+                alert("Error de conexión");
             }
         }
 
         async function generarReporte() {
             const start = document.getElementById('dateStart').value;
             const end = document.getElementById('dateEnd').value;
-            if (!start || !end) return alert("⚠️ Selecciona ambas fechas");
+            if (!start || !end) return alert("Selecciona ambas fechas");
 
             try {
                 const res = await fetch(`/admin/export-logs?start=${start}&end=${end}`);
@@ -130,7 +166,7 @@
                     descargarExcel(logs);
                 }
             } catch (err) {
-                alert("❌ Error al cargar datos");
+                alert("Error al cargar datos");
                 console.error(err);
             }
         }
@@ -138,8 +174,8 @@
         function descargarExcel(data) {
             const ws = XLSX.utils.json_to_sheet(data.map(l => ({
                 Fecha: new Date(l.timestamp).toLocaleString('es-ES'),
-                Usuario: l.username,
-                Tipo: l.type,
+                Usuario: l.username || 'Sistema',
+                Tipo: l.type || 'general',
                 Mensaje: l.message
             })));
             const wb = XLSX.utils.book_new();
