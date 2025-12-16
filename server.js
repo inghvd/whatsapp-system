@@ -8,12 +8,12 @@ const { Server } = require('socket.io');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // ✅ Store persistente v4
+const MongoStore = require('connect-mongo');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const mongoose = require('mongoose');
-const path = require('path'); // ← Agregado para rutas estáticas
+const path = require('path');
 
 // --- 2) Inicialización de servidor y sockets ---
 const app = express();
@@ -82,7 +82,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // --- 8) Middlewares generales ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public'))); // ← Mejorado con path
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- 9) Sesiones con MongoStore v4 ---
 app.use(session({
@@ -91,12 +91,12 @@ app.use(session({
   saveUninitialized: false,
   store: MongoStore.create({
     mongoUrl: process.env.DB_URL,
-    ttl: 24 * 60 * 60, // 1 día
+    ttl: 24 * 60 * 60,
     collectionName: 'sessions'
   }),
   cookie: {
-    maxAge: 3600000, // 1 hora
-    secure: false // Render maneja TLS
+    maxAge: 3600000,
+    secure: false
   }
 }));
 console.log('🔐 SessionStore: MongoStore v4 configurado');
@@ -151,10 +151,10 @@ const auth = (req, res, next) =>
   !req.session.userId ? res.status(403).json({ error: 'Sesión expirada' }) : next();
 
 // --- 12) CRUD de Contactos (agentes) ---
-// ... (todas tus rutas de contactos quedan igual: add-contact, my-contacts, etc.)
-// (No las repito aquí para no alargar, pero déjalas exactamente como las tenías)
+// ← Aquí van tus rutas de contactos originales (add-contact, my-contacts, etc.)
+// No las incluyo para no alargar, pero déjalas tal cual las tenías
 
-// --- NUEVAS RUTAS PARA EL PANEL ADMIN ---
+// --- RUTAS ADMIN CORREGIDAS Y MEJORADAS ---
 const adminAuth = (req, res, next) => {
   if (!req.session.userId || req.session.role !== 'admin') {
     return res.status(403).json({ error: 'Acceso denegado: solo admin' });
@@ -162,7 +162,7 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-// Crear nuevo usuario agente
+// Crear usuario agente
 app.post('/admin/create-user', adminAuth, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -182,18 +182,19 @@ app.post('/admin/create-user', adminAuth, async (req, res) => {
       message: `Creó usuario agente: ${username}`
     });
 
-    res.json({ success: true, msg: 'Usuario creado correctamente' });
+    // ← CORREGIDO: ahora devuelve 'message' para que el frontend muestre texto bonito
+    res.json({ success: true, message: 'Usuario creado correctamente' });
   } catch (e) {
     console.error('❌ Error /admin/create-user:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });
 
-// Listar todos los usuarios (solo agentes + admin)
+// Listar usuarios
 app.get('/admin/get-users', adminAuth, async (req, res) => {
   try {
     const users = await User.find({}, 'username role -_id');
-    res.json(users);
+    res.json({ success: true, users });
   } catch (e) {
     console.error('❌ Error /admin/get-users:', e);
     res.status(500).json({ error: 'Error interno' });
@@ -218,15 +219,15 @@ app.post('/admin/delete-user', adminAuth, async (req, res) => {
       message: `Eliminó usuario agente: ${username}`
     });
 
-    res.json({ success: true, msg: 'Usuario eliminado' });
+    res.json({ success: true, message: 'Usuario eliminado correctamente' });
   } catch (e) {
     console.error('❌ Error /admin/delete-user:', e);
     res.status(500).json({ error: 'Error interno' });
   }
 });
 
-// --- 13) Endpoints de depuración (mantén los que tenías) ---
-// ... (debug/users, debug/contacts, etc.)
+// --- 13) Endpoints de depuración (opcional, mantenlos si los usas) ---
+// ...
 
 // --- 14) Salud del servicio ---
 app.get('/health', (req, res) => {
