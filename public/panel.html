@@ -1,191 +1,218 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Gerencia - Reportes WhatsApp</title>
-    <meta charset="UTF-8">
+    <title>Panel Vendedor</title>
+    <script src="/socket.io/socket.io.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .contact-item { font-size: 0.9em; }
+        .action-btn { cursor: pointer; margin-left: 5px; }
+    </style>
 </head>
-<body class="bg-light p-4">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>📊 Panel Gerencial</h2>
-            <div>
-                <a href="/panel.html" class="btn btn-outline-primary me-2">Ir a Operaciones</a>
-                <button onclick="window.location.href='/login.html'" class="btn btn-danger">Salir</button>
-            </div>
-        </div>
-
-        <!-- CREAR USUARIOS -->
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-primary text-white">👥 Gestión de Equipo</div>
-            <div class="card-body d-flex gap-2 align-items-end">
-                <div class="flex-grow-1">
-                    <label class="small">Usuario Nuevo</label>
-                    <input id="newUser" class="form-control" placeholder="Ej: vendedor1">
-                </div>
-                <div class="flex-grow-1">
-                    <label class="small">Contraseña</label>
-                    <input id="newPass" type="password" class="form-control" placeholder="Ej: clave123">
-                </div>
-                <button onclick="createUser()" class="btn btn-success">Crear Usuario</button>
-            </div>
-        </div>
-
-        <!-- LISTA DE USUARIOS -->
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-info text-white">Usuarios Registrados</div>
-            <div class="card-body">
-                <table class="table table-sm table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Usuario</th>
-                            <th>Rol</th>
-                        </tr>
-                    </thead>
-                    <tbody id="userList">
-                        <tr><td colspan="2" class="text-center text-muted">Cargando usuarios...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- REPORTES -->
-        <div class="card shadow-sm border-success">
-            <div class="card-header bg-success text-white">📥 Generador de Reportes (Excel)</div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <label class="fw-bold">Fecha Inicio:</label>
-                        <input type="date" id="dateStart" class="form-control">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="fw-bold">Fecha Fin:</label>
-                        <input type="date" id="dateEnd" class="form-control">
-                    </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button onclick="generarReporte()" class="btn btn-dark w-100">🔍 Buscar y Exportar</button>
+<body class="bg-light p-3">
+    <nav class="navbar navbar-light bg-white shadow-sm mb-3 px-3 rounded justify-content-between">
+        <span class="navbar-brand h5">🚀 Panel: <b id="uDisplay"></b></span>
+        <button onclick="logout()" class="btn btn-sm btn-outline-danger">Salir</button>
+    </nav>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 1. Conexión WhatsApp (QR) -->
+            <div class="col-md-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header bg-success text-white text-center">Conexión WhatsApp</div>
+                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                        <div id="qrArea">
+                            <div class="spinner-border text-success" role="status"></div>
+                            <p class="mt-2">Cargando QR...</p>
+                        </div>
                     </div>
                 </div>
-                <hr>
-                <h6>Vista Previa de Datos:</h6>
-                <div style="height: 400px; overflow: auto; border: 1px solid #ccc;">
-                    <table class="table table-striped table-hover table-sm">
-                        <thead class="table-dark" style="position: sticky; top: 0;">
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Usuario</th>
-                                <th>Tipo</th>
-                                <th>Detalle</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tbody">
-                            <tr><td colspan="4" class="text-center text-muted py-4">Selecciona fechas para ver datos</td></tr>
-                        </tbody>
-                    </table>
+            </div>
+
+            <!-- 2. Gestión de Clientes -->
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-warning">
+                    <div class="card-header bg-warning">Gestión de Clientes</div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs mb-2">
+                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#manual">Manual / Editar</a></li>
+                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#import">Subir Excel</a></li>
+                        </ul>
+                        <div class="tab-content mb-2">
+                            <div class="tab-pane fade show active" id="manual">
+                                <input type="hidden" id="editId">
+                                <input id="name" class="form-control mb-1 form-control-sm" placeholder="Nombre">
+                                <input id="phone" class="form-control mb-2 form-control-sm" placeholder="Tel (595...)">
+                                <div class="d-flex gap-1">
+                                    <button onclick="saveContact()" id="btnSave" class="btn btn-warning btn-sm w-100">Guardar</button>
+                                    <button onclick="cancelEdit()" id="btnCancel" class="btn btn-secondary btn-sm" style="display:none;">✕</button>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="import">
+                                <input type="file" id="fileInput" class="form-control mb-2 form-control-sm" accept=".xlsx,.csv">
+                                <button onclick="uploadFile()" class="btn btn-success btn-sm w-100">📂 Procesar</button>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                            <small class="fw-bold">Agenda: <span id="count">0</span></small>
+                            <button onclick="clearAll()" class="btn btn-outline-danger btn-sm">🗑️ Vaciar Agenda</button>
+                        </div>
+                        <ul id="list" class="list-group mt-2" style="max-height: 250px; overflow: auto;"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Configurar y Enviar Mensaje -->
+            <div class="col-md-5">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">Configurar Mensaje</div>
+                    <div class="card-body">
+                        <textarea id="msg" class="form-control mb-2" rows="5" placeholder="Hola {name}, ..."></textarea>
+                        <div class="alert alert-info py-1 px-2 small mb-2">
+                            Usa <b>{name}</b> para personalizar con el nombre.
+                        </div>
+                        <button onclick="send()" class="btn btn-primary w-100 mb-2">🚀 INICIAR ENVÍO MASIVO</button>
+                        <div class="bg-dark text-white p-2 rounded small" id="logs" style="height: 140px; overflow: auto; font-family: monospace;"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dateStart').value = today;
-        document.getElementById('dateEnd').value = today;
+        const socket = io();
+        const user = localStorage.getItem('user') || '';
+        document.getElementById('uDisplay').innerText = user;
 
-        // Cargar lista de usuarios
-        async function loadUsers() {
-            try {
-                const res = await fetch('/admin/get-users');
-                const d = await res.json();
-                const tbody = document.getElementById('userList');
-                tbody.innerHTML = '';
-                if (d.success && d.users.length > 0) {
-                    d.users.forEach(u => {
-                        tbody.innerHTML += `<tr><td><b>${u.username}</b></td><td>${u.role}</td></tr>`;
-                    });
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No hay usuarios</td></tr>';
-                }
-            } catch (err) {
-                document.getElementById('userList').innerHTML = '<tr><td colspan="2">Error al cargar</td></tr>';
-            }
-        }
-        loadUsers();
+        // QR y estado WhatsApp
+        socket.on('qr', (data) => {
+            document.getElementById('qrArea').innerHTML = `<img src="${data.src}" class="img-fluid" alt="Escanea este QR con WhatsApp">`;
+        });
 
-        // Crear usuario
-        async function createUser() {
-            const u = document.getElementById('newUser').value.trim();
-            const p = document.getElementById('newPass').value;
-            if (!u || !p) return alert("Completa usuario y contraseña");
+        socket.on('ready', () => {
+            document.getElementById('qrArea').innerHTML = '<h5 class="text-success">✅ WhatsApp Conectado</h5><p>Puedes enviar mensajes</p>';
+        });
 
-            try {
-                const res = await fetch('/admin/create-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: u, password: p })
-                });
-                const d = await res.json();
-                alert(d.success ? "✅ " + d.message : "❌ " + (d.error || "Error"));
-                if (d.success) {
-                    document.getElementById('newUser').value = '';
-                    document.getElementById('newPass').value = '';
-                    loadUsers();
-                }
-            } catch (err) {
-                alert("Error de conexión");
-            }
+        loadContacts();
+
+        // --- CONTACTOS ---
+        async function loadContacts() {
+            const res = await fetch('/my-contacts');
+            if (res.status === 403) location.href = '/login.html';
+            const data = await res.json();
+            document.getElementById('count').innerText = data.length;
+            const list = document.getElementById('list');
+            list.innerHTML = '';
+            data.forEach(c => {
+                list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center p-1 contact-item">
+                    <span>${c.name} <span class="text-muted">(${c.phone})</span></span>
+                    <div>
+                        <span class="action-btn text-primary" onclick="editMode('${c._id}', '${c.name}', '${c.phone}')">✏️</span>
+                        <span class="action-btn text-danger" onclick="deleteOne('${c._id}')">🗑️</span>
+                    </div>
+                </li>`;
+            });
         }
 
-        // Generar reporte
-        async function generarReporte() {
-            const start = document.getElementById('dateStart').value;
-            const end = document.getElementById('dateEnd').value;
-            if (!start || !end) return alert("Selecciona ambas fechas");
+        async function saveContact() {
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('name').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            if (!name || !phone) return alert("Completa nombre y teléfono");
 
-            try {
-                const res = await fetch(`/admin/export-logs?start=${start}&end=${end}`);
-                const logs = await res.json();
-
-                const tbody = document.getElementById('tbody');
-                tbody.innerHTML = '';
-
-                if (!logs || logs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No hay registros en las fechas seleccionadas</td></tr>';
-                    return;
-                }
-
-                logs.forEach(l => {
-                    const fecha = new Date(l.timestamp).toLocaleString('es-ES');
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${fecha}</td>
-                            <td class="fw-bold">${l.username || 'Sistema'}</td>
-                            <td><span class="badge bg-primary">${l.type || 'general'}</span></td>
-                            <td class="small text-muted">${l.message}</td>
-                        </tr>`;
-                });
-
-                if (confirm(`✅ ${logs.length} registros encontrados.\n¿Descargar Excel?`)) {
-                    descargarExcel(logs);
-                }
-            } catch (err) {
-                alert("Error al cargar reportes");
-                console.error(err);
+            let url = '/add-contact';
+            let body = { name, phone };
+            if (id) {
+                url = '/update-contact';
+                body.id = id;
             }
+
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            cancelEdit();
+            loadContacts();
         }
 
-        function descargarExcel(data) {
-            const ws = XLSX.utils.json_to_sheet(data.map(l => ({
-                Fecha: new Date(l.timestamp).toLocaleString('es-ES'),
-                Usuario: l.username || 'Sistema',
-                Tipo: l.type || 'general',
-                Mensaje: l.message
-            })));
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-            const fecha = new Date().toISOString().slice(0,10);
-            XLSX.writeFile(wb, `Reporte_WhatsApp_${fecha}.xlsx`);
+        function editMode(id, name, phone) {
+            document.getElementById('editId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('btnSave').innerText = 'Actualizar';
+            document.getElementById('btnCancel').style.display = 'inline-block';
+        }
+
+        function cancelEdit() {
+            document.getElementById('editId').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('btnSave').innerText = 'Guardar';
+            document.getElementById('btnCancel').style.display = 'none';
+        }
+
+        async function deleteOne(id) {
+            if (!confirm("¿Eliminar este contacto?")) return;
+            await fetch('/delete-contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            loadContacts();
+        }
+
+        async function clearAll() {
+            if (!confirm("¿Vaciar toda la agenda?")) return;
+            await fetch('/clear-contacts', { method: 'POST' });
+            loadContacts();
+        }
+
+        async function uploadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return alert("Selecciona un archivo");
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch('/import-contacts', { method: 'POST', body: formData });
+            loadContacts();
+        }
+
+        async function send() {
+            const msg = document.getElementById('msg').value.trim();
+            if (!msg) return alert("Escribe un mensaje");
+
+            const res = await fetch('/my-contacts');
+            const contacts = await res.json();
+            if (contacts.length === 0) return alert("No hay contactos en la agenda");
+
+            const logs = document.getElementById('logs');
+            logs.innerHTML = 'Iniciando envío masivo...\n';
+
+            for (const c of contacts) {
+                const personalized = msg.replace(/{name}/g, c.name);
+                // Aquí va tu código real de envío con whatsapp-web.js (client.sendMessage)
+                // Ejemplo:
+                // try {
+                //   await client.sendMessage(c.phone + '@c.us', personalized);
+                //   logs.innerHTML += `[${c.name}] Enviado ✅\n`;
+                // } catch (err) {
+                //   logs.innerHTML += `[${c.name}] Error ❌\n`;
+                // }
+                logs.innerHTML += `[${c.name}] Simulado (envío real en producción)\n`;
+                logs.scrollTop = logs.scrollHeight;
+                await new Promise(r => setTimeout(r, 1000)); // delay para simular
+            }
+
+            alert("Envío masivo completado");
+        }
+
+        function logout() {
+            fetch('/logout', { method: 'POST' });
+            localStorage.clear();
+            location.href = '/login.html';
         }
     </script>
 </body>
