@@ -152,7 +152,98 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-// --- 12) RUTAS ADMIN (CORREGIDAS Y COMPLETAS) ---
+// --- RUTAS DE CONTACTOS PARA AGENTES (ESTO FALTABA) ---
+app.get('/my-contacts', auth, async (req, res) => {
+  try {
+    const contacts = await Contact.find({ userId: req.session.userId }).sort({ name: 1 });
+    res.json(contacts);
+  } catch (e) {
+    console.error('Error /my-contacts:', e);
+    res.status(500).json([]);
+  }
+});
+
+app.post('/add-contact', auth, async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone) return res.status(400).json({ error: 'Teléfono inválido' });
+
+    await Contact.create({
+      userId: req.session.userId,
+      phone: cleanPhone,
+      name: name.trim() || 'Cliente'
+    });
+    res.json({ success: true });
+  } catch (e) {
+    if (e.code === 11000) return res.json({ error: 'Contacto ya existe' });
+    res.status(500).json({ error: 'Error' });
+  }
+});
+
+app.post('/update-contact', auth, async (req, res) => {
+  try {
+    const { id, name, phone } = req.body;
+    const cleanPhone = phone.replace(/\D/g, '');
+    await Contact.updateOne(
+      { _id: id, userId: req.session.userId },
+      { name: name.trim() || 'Cliente', phone: cleanPhone }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error' });
+  }
+});
+
+app.post('/delete-contact', auth, async (req, res) => {
+  try {
+    const { id } = req.body;
+    await Contact.deleteOne({ _id: id, userId: req.session.userId });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error' });
+  }
+});
+
+app.post('/clear-contacts', auth, async (req, res) => {
+  try {
+    await Contact.deleteMany({ userId: req.session.userId });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Error' });
+  }
+});
+
+app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file' });
+    const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(sheet);
+    let count = 0;
+    for (const r of rows) {
+      const name = (r.Nombre || r.name || '').trim();
+      const phone = String(r.Tel || r.phone || r.telefono || '').replace(/\D/g, '');
+      if (!phone) continue;
+      try {
+        await Contact.create({
+          userId: req.session.userId,
+          phone,
+          name: name || 'Cliente'
+        });
+        count++;
+      } catch (e) {
+        if (e.code !== 11000) console.error(e);
+      }
+    }
+    res.json({ success: true, msg: `Importados ${count} contactos` });
+  } catch (e) {
+    console.error('Error import:', e);
+    res.status(500).json({ error: 'Error' });
+  }
+});
+
+// --- RUTAS ADMIN ---
 app.post('/admin/create-user', adminAuth, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -204,7 +295,7 @@ app.post('/admin/delete-user', adminAuth, async (req, res) => {
   }
 });
 
-// --- REPORTE CORREGIDO (zona horaria local) ---
+// --- REPORTE ---
 app.get('/admin/export-logs', adminAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -228,10 +319,10 @@ app.get('/admin/export-logs', adminAuth, async (req, res) => {
   }
 });
 
-// --- 14) Health ---
+// --- Health ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// --- 15) Listen ---
+// --- Listen ---
 server.listen(PORT, () => {
   console.log(`🔥 SISTEMA LISTO EN PUERTO ${PORT}`);
 });
