@@ -81,16 +81,14 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Lógica del panel (tu código original) -->
     <script>
         const socket = io();
         document.getElementById('uDisplay').innerText = localStorage.getItem('user') || '';
         loadContacts();
 
-        // --- CONTACTOS ---
+        // --- CONTACTOS (tu código original) ---
         async function loadContacts() {
             const res = await fetch('/my-contacts');
             if(res.status===403) location.href='/login.html';
@@ -164,8 +162,7 @@
             location.href = '/login.html';
         }
 
-        // Tu código de WhatsApp (QR, envío masivo, logs, etc.) va aquí
-        // (pégalo tal cual lo tenías antes)
+        // Tu código de WhatsApp QR y envío masivo va aquí (el que ya tenías)
     </script>
 </body>
 </html>
