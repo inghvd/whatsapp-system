@@ -46,6 +46,7 @@ const contactSchema = new mongoose.Schema({
   name: String
 });
 contactSchema.index({ userId: 1, phone: 1 }, { unique: true });
+
 const logSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, index: true },
   username: String,
@@ -53,6 +54,7 @@ const logSchema = new mongoose.Schema({
   message: String,
   timestamp: { type: Date, default: Date.now, index: true }
 });
+
 const User = mongoose.model('User', userSchema);
 const Contact = mongoose.model('Contact', contactSchema);
 const Log = mongoose.model('Log', logSchema);
@@ -86,12 +88,12 @@ app.use(session({
   saveUninitialized: false,
   store: MongoStore.create({
     mongoUrl: process.env.DB_URL,
-    ttl: 24 * 60 * 60,
+    ttl: 24 * 60 * 60, // 1 día
     collectionName: 'sessions'
   }),
   cookie: {
     maxAge: 3600000, // 1 hora
-    secure: false    // Render maneja TLS, false funciona bien
+    secure: false    // Render maneja TLS en el edge; false funciona en backend
   }
 }));
 console.log('🔐 SessionStore: MongoStore v4 configurado');
@@ -226,4 +228,83 @@ app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
     let count = 0;
 
     for (const r of rows) {
-      const name
+      const name = (r.Nombre || r.name || '').trim();
+      const phone = String(r.Tel || r.phone || '').replace(/\D/g, '');
+      if (!phone) continue;
+
+      try {
+        await Contact.create({
+          userId: req.session.userId,
+          phone,
+          name: name || 'Cliente'
+        });
+        count++;
+      } catch (e) {
+        // Ignorar duplicados
+        if (e.code !== 11000) console.error('❌ Error fila import:', e);
+      }
+    }
+
+    res.json({ msg: `Importados ${count} contactos` });
+  } catch (e) {
+    console.error('❌ Error import-contacts:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// --- 13) Endpoints de depuración ---
+app.get('/debug/users', async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.json(users);
+  } catch (e) {
+    console.error('❌ Error debug/users:', e);
+    res.status(500).json({ error: 'Error listando usuarios' });
+  }
+});
+
+app.get('/debug/contacts', async (req, res) => {
+  try {
+    const contacts = await Contact.find({}).limit(100).sort({ name: 1 });
+    res.json(contacts);
+  } catch (e) {
+    console.error('❌ Error debug/contacts:', e);
+    res.status(500).json({ error: 'Error listando contactos' });
+  }
+});
+
+app.get('/debug/logs', async (req, res) => {
+  try {
+    const logs = await Log.find({}).limit(50).sort({ timestamp: -1 });
+    res.json(logs);
+  } catch (e) {
+    console.error('❌ Error debug/logs:', e);
+    res.status(500).json({ error: 'Error listando logs' });
+  }
+});
+
+// Crear admin manualmente (para forzar aparición de colección users)
+app.get('/debug/create-admin', async (req, res) => {
+  try {
+    const exists = await User.findOne({ username: 'admin' });
+    if (exists) return res.json({ msg: 'Admin ya existe' });
+
+    const hash = bcrypt.hashSync('1234', 10);
+    await User.create({ username: 'admin', password: hash, role: 'admin' });
+    res.json({ msg: '✅ Admin creado en MongoDB' });
+  } catch (e) {
+    console.error('❌ Error creando admin:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// --- 14) Salud del servicio ---
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', mongo: mongoose.connection.readyState });
+});
+
+// --- 15) Arranque del servidor ---
+server.listen(PORT, () => {
+  console.log(`🔥 SISTEMA V2.0 LISTO EN PUERTO ${PORT}`);
+});
+
