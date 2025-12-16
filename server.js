@@ -36,40 +36,41 @@ mongoose.connect(process.env.DB_URL)
     process.exit(1);
   });
 
-// --- 5) Modelos (Mongoose) ---
+// --- 5) Modelos (Mongoose) Mejorados ---
 const userSchema = new mongoose.Schema({
-  username: { type: String, unique: true, index: true },
-  password: String,
-  role: { type: String, default: 'agent' }
+  username: { type: String, unique: true, required: true, index: true },
+  password: { type: String, required: true },
+  role: { type: String, default: 'agent', enum: ['agent', 'admin'] }
 });
 
 const contactSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, index: true },
-  phone: { type: String, index: true },
-  name: String
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  phone: { type: String, required: true, index: true },
+  name: { type: String, default: 'Cliente' }
 });
 contactSchema.index({ userId: 1, phone: 1 }, { unique: true });
 
 const logSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, index: true },
-  username: String,
-  type: String,
-  message: String,
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  username: { type: String, required: true },
+  type: { type: String, default: 'general' },
+  message: { type: String, required: true },
   timestamp: { type: Date, default: Date.now, index: true }
 });
+logSchema.index({ timestamp: -1 });
 
 const User = mongoose.model('User', userSchema);
 const Contact = mongoose.model('Contact', contactSchema);
 const Log = mongoose.model('Log', logSchema);
 
-// --- 6) Semilla de admin por defecto ---
+// --- 6) Semilla de admin por defecto (temporal, cámbiala después) ---
 (async () => {
   try {
     const admin = await User.findOne({ username: 'admin' });
     if (!admin) {
       const hash = bcrypt.hashSync('1234', 10);
       await User.create({ username: 'admin', password: hash, role: 'admin' });
-      console.log('👤 Usuario admin inicial creado');
+      console.log('👤 Usuario admin inicial creado (cambia la contraseña ASAP)');
     }
   } catch (e) {
     console.error('❌ Error creando admin inicial:', e);
@@ -96,7 +97,7 @@ app.use(session({
   }),
   cookie: {
     maxAge: 3600000,
-    secure: false
+    secure: false // Render maneja HTTPS
   }
 }));
 console.log('🔐 SessionStore: MongoStore v4 configurado');
@@ -124,7 +125,7 @@ client.on('ready', () => {
 
 client.initialize();
 
-// --- 11) Autenticación y sesión ---
+// --- 11) Autenticación y middlewares ---
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
@@ -150,11 +151,6 @@ app.post('/logout', (req, res) => {
 const auth = (req, res, next) =>
   !req.session.userId ? res.status(403).json({ error: 'Sesión expirada' }) : next();
 
-// --- 12) CRUD de Contactos (agentes) ---
-// ← Aquí van tus rutas de contactos originales (add-contact, my-contacts, etc.)
-// No las incluyo para no alargar, pero déjalas tal cual las tenías
-
-// --- RUTAS ADMIN CORREGIDAS Y MEJORADAS ---
 const adminAuth = (req, res, next) => {
   if (!req.session.userId || req.session.role !== 'admin') {
     return res.status(403).json({ error: 'Acceso denegado: solo admin' });
@@ -162,7 +158,10 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-// Crear usuario agente
+// --- 12) CRUD de Contactos (agentes) ---
+// ← Mantén aquí todas tus rutas originales de contactos (add-contact, my-contacts, etc.)
+
+// --- 13) RUTAS DEL PANEL ADMIN ---
 app.post('/admin/create-user', adminAuth, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -182,7 +181,6 @@ app.post('/admin/create-user', adminAuth, async (req, res) => {
       message: `Creó usuario agente: ${username}`
     });
 
-    // ← CORREGIDO: ahora devuelve 'message' para que el frontend muestre texto bonito
     res.json({ success: true, message: 'Usuario creado correctamente' });
   } catch (e) {
     console.error('❌ Error /admin/create-user:', e);
@@ -190,7 +188,6 @@ app.post('/admin/create-user', adminAuth, async (req, res) => {
   }
 });
 
-// Listar usuarios
 app.get('/admin/get-users', adminAuth, async (req, res) => {
   try {
     const users = await User.find({}, 'username role -_id');
@@ -201,7 +198,6 @@ app.get('/admin/get-users', adminAuth, async (req, res) => {
   }
 });
 
-// Eliminar usuario agente
 app.post('/admin/delete-user', adminAuth, async (req, res) => {
   try {
     const { username } = req.body;
@@ -226,8 +222,26 @@ app.post('/admin/delete-user', adminAuth, async (req, res) => {
   }
 });
 
-// --- 13) Endpoints de depuración (opcional, mantenlos si los usas) ---
-// ...
+// Generador de reportes para admin.html
+app.get('/admin/export-logs', adminAuth, async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    let query = {};
+
+    if (start && end) {
+      query.timestamp = {
+        $gte: new Date(start + 'T00:00:00Z'),
+        $lte: new Date(end + 'T23:59:59Z')
+      };
+    }
+
+    const logs = await Log.find(query).sort({ timestamp: -1 }).lean();
+    res.json(logs);
+  } catch (e) {
+    console.error('❌ Error /admin/export-logs:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
 
 // --- 14) Salud del servicio ---
 app.get('/health', (req, res) => {
