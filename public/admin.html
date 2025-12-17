@@ -16,11 +16,12 @@
             </div>
         </div>
 
-        <!-- GESTIÓN DE EQUIPO (MEJORADA) -->
+        <!-- GESTIÓN DE EQUIPO -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-primary text-white">👥 Gestión de Equipo</div>
             <div class="card-body">
-                <div class="row g-3 align-items-end">
+                <!-- Crear Usuario con Rol -->
+                <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <label class="small">Usuario Nuevo</label>
                         <input id="newUser" class="form-control" placeholder="Ej: vendedor1">
@@ -36,26 +37,26 @@
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-2 d-flex align-items-end">
                         <button onclick="createUser()" class="btn btn-success w-100">Crear Usuario</button>
                     </div>
                 </div>
 
-                <!-- CAMBIAR CONTRASEÑA -->
-                <hr class="my-4">
-                <h5 class="text-primary">Cambiar Contraseña</h5>
-                <div class="row g-3 align-items-end">
+                <!-- Cambiar Contraseña -->
+                <hr>
+                <h5 class="text-primary mb-3">Cambiar Contraseña</h5>
+                <div class="row g-3">
                     <div class="col-md-6">
-                        <input id="changeUser" class="form-control" placeholder="Usuario a modificar">
+                        <input id="changeUser" class="form-control" placeholder="Nombre de usuario">
                     </div>
                     <div class="col-md-4">
                         <input id="changePass" type="password" class="form-control" placeholder="Nueva contraseña">
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-2 d-flex align-items-end">
                         <button onclick="changePassword()" class="btn btn-warning w-100">Cambiar</button>
                     </div>
                 </div>
-                <div id="msgChange" class="mt-2 small"></div>
+                <div id="msgChange" class="mt-2"></div>
             </div>
         </div>
 
@@ -71,7 +72,7 @@
                         </tr>
                     </thead>
                     <tbody id="userList">
-                        <tr><td colspan="2" class="text-center text-muted">Cargando usuarios...</td></tr>
+                        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -135,7 +136,7 @@
                     tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No hay usuarios</td></tr>';
                 }
             } catch (err) {
-                document.getElementById('userList').innerHTML = '<tr><td colspan="2">Error al cargar</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error al cargar</td></tr>';
             }
         }
         loadUsers();
@@ -179,19 +180,17 @@
                 });
                 const d = await res.json();
                 const msg = document.getElementById('msgChange');
+                msg.innerHTML = d.success ? '<span class="text-success">✅ Contraseña cambiada</span>' : '<span class="text-danger">❌ ' + (d.error || "Error") + '</span>';
                 if (d.success) {
-                    msg.innerHTML = `<span class="text-success">✅ ${d.message}</span>`;
                     document.getElementById('changeUser').value = '';
                     document.getElementById('changePass').value = '';
-                } else {
-                    msg.innerHTML = `<span class="text-danger">❌ ${d.error || "Error"}</span>`;
                 }
             } catch (err) {
                 document.getElementById('msgChange').innerHTML = '<span class="text-danger">Error de conexión</span>';
             }
         }
 
-        // Generar reporte (sin cambios)
+        // Reportes (sin cambios)
         async function generarReporte() {
             const start = document.getElementById('dateStart').value;
             const end = document.getElementById('dateEnd').value;
@@ -225,7 +224,6 @@
                 }
             } catch (err) {
                 alert("Error al cargar reportes");
-                console.error(err);
             }
         }
 
