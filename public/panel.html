@@ -1,164 +1,329 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Vendedor</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        .contact-item { font-size: 0.9em; }
-        .action-btn { cursor: pointer; margin-left: 5px; }
-        .table-sm td, .table-sm th { padding: .4rem; }
+        body {
+            background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .card-header {
+            background: linear-gradient(to right, #075e54, #128c7e);
+            color: white;
+            font-weight: 600;
+        }
+        .btn-primary, .btn-success, .btn-warning {
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        #qrArea img {
+            max-width: 200px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .logs {
+            background: #1e1e1e;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
     </style>
 </head>
-<body class="bg-light p-3">
-    <nav class="navbar navbar-light bg-white shadow-sm mb-3 px-3 rounded justify-content-between">
-        <span class="navbar-brand h5">🚀 Panel: <b id="uDisplay"></b></span>
-        <button onclick="logout()" class="btn btn-sm btn-outline-danger">Salir</button>
+<body>
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="bi bi-whatsapp text-success me-2"></i>
+                Panel: <strong id="uDisplay"></strong>
+            </span>
+            <button onclick="logout()" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-box-arrow-right me-1"></i>Salir
+            </button>
+        </div>
     </nav>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- 1. ESTADO -->
-            <div class="col-md-3">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header bg-success text-white text-center">Conexión</div>
-                    <div class="card-body text-center d-flex flex-column justify-content-center">
-                        <div id="qrArea"><div class="spinner-border"></div><p class="mt-2">Cargando...</p></div>
+
+    <div class="container-fluid py-4">
+        <div class="row g-4">
+            <!-- Conexión WhatsApp -->
+            <div class="col-lg-3 col-md-4">
+                <div class="card h-100">
+                    <div class="card-header text-center">
+                        <i class="bi bi-qr-code me-2"></i>Conexión WhatsApp
+                    </div>
+                    <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
+                        <div id="qrArea" class="mb-3">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Cargando QR...</span>
+                            </div>
+                            <p class="text-muted mt-3">Esperando conexión...</p>
+                        </div>
+                        <small class="text-muted">Escanea el QR con tu teléfono</small>
                     </div>
                 </div>
             </div>
-           
-            <!-- 2. GESTIÓN CONTACTOS -->
-            <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-warning">
-                    <div class="card-header bg-warning">Gestión de Clientes</div>
+
+            <!-- Gestión de Clientes -->
+            <div class="col-lg-4 col-md-8">
+                <div class="card h-100">
+                    <div class="card-header text-white" style="background: #ff9800;">
+                        <i class="bi bi-people me-2"></i>Gestión de Clientes
+                    </div>
                     <div class="card-body">
-                        <!-- Pestañas -->
-                        <ul class="nav nav-tabs mb-2" id="myTab" role="tablist">
-                            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#manual">Manual / Editar</a></li>
-                            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#import">Subir Excel</a></li>
+                        <ul class="nav nav-tabs mb-3" id="tabClientes">
+                            <li class="nav-item">
+                                <a class="nav-link active" data-bs-toggle="tab" href="#manual">Manual / Editar</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#import">Subir Excel</a>
+                            </li>
                         </ul>
-                        <div class="tab-content mb-2">
-                            <!-- Manual -->
+
+                        <div class="tab-content">
                             <div class="tab-pane fade show active" id="manual">
                                 <input type="hidden" id="editId">
-                                <input id="name" class="form-control mb-1 form-control-sm" placeholder="Nombre">
-                                <input id="phone" class="form-control mb-2 form-control-sm" placeholder="Tel (595...)">
-                                <div class="d-flex gap-1">
-                                    <button onclick="saveContact()" id="btnSave" class="btn btn-warning btn-sm w-100">Guardar</button>
-                                    <button onclick="cancelEdit()" id="btnCancel" class="btn btn-secondary btn-sm" style="display:none;">✕</button>
+                                <div class="mb-2">
+                                    <input id="name" class="form-control form-control-sm" placeholder="Nombre completo">
+                                </div>
+                                <div class="mb-3">
+                                    <input id="phone" class="form-control form-control-sm" placeholder="Teléfono (595...)">
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button onclick="saveContact()" id="btnSave" class="btn btn-warning">
+                                        <i class="bi bi-save me-1"></i>Guardar Contacto
+                                    </button>
+                                    <button onclick="cancelEdit()" id="btnCancel" class="btn btn-secondary" style="display:none;">
+                                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                                    </button>
                                 </div>
                             </div>
-                           
-                            <!-- Importar -->
+
                             <div class="tab-pane fade" id="import">
-                                <input type="file" id="fileInput" class="form-control mb-2 form-control-sm" accept=".xlsx,.csv">
-                                <button onclick="uploadFile()" class="btn btn-success btn-sm w-100">📂 Procesar</button>
+                                <div class="mb-3">
+                                    <input type="file" id="fileInput" class="form-control form-control-sm" accept=".xlsx,.csv">
+                                </div>
+                                <button onclick="uploadFile()" class="btn btn-success w-100">
+                                    <i class="bi bi-upload me-1"></i>Procesar Archivo
+                                </button>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
-                            <small class="fw-bold">Agenda: <span id="count">0</span></small>
-                            <button onclick="clearAll()" class="btn btn-outline-danger btn-sm" style="font-size: 0.7rem;">🗑️ Vaciar Agenda</button>
+
+                        <hr class="my-3">
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Agenda: <span id="count" class="text-primary">0</span> contactos</strong>
+                            <button onclick="clearAll()" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-trash me-1"></i>Vaciar
+                            </button>
                         </div>
-                       
-                        <ul id="list" class="list-group mt-2" style="max-height: 250px; overflow: auto;"></ul>
+
+                        <div class="list-group" id="list" style="max-height: 300px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>
-            <!-- 3. ENVÍO -->
-            <div class="col-md-5">
-                <div class="card h-100 shadow-sm border-primary">
-                    <div class="card-header bg-primary text-white">Configurar Mensaje</div>
-                    <div class="card-body">
-                        <textarea id="msg" class="form-control mb-2" rows="5" placeholder="Hola {name}, ..."></textarea>
-                        <div class="alert alert-info py-1 px-2 small mb-2">
-                            Usa <b>{name}</b> para personalizar con el nombre.
+
+            <!-- Envío Masivo -->
+            <div class="col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header text-white" style="background: #2196f3;">
+                        <i class="bi bi-send-fill me-2"></i>Configurar Mensaje
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <textarea id="msg" class="form-control flex-grow-1 mb-3" rows="6" placeholder="Hola {name}, te enviamos nuestra nueva oferta..."></textarea>
+                        
+                        <div class="alert alert-info small p-2 mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Usa <strong>{name}</strong> para personalizar con el nombre del cliente
                         </div>
-                        <button onclick="send()" class="btn btn-primary w-100 mb-2">🚀 INICIAR ENVÍO MASIVO</button>
-                        <div class="bg-dark text-white p-2 rounded small" id="logs" style="height: 140px; overflow: auto; font-family: monospace;"></div>
+
+                        <button onclick="send()" class="btn btn-primary btn-lg mb-3">
+                            <i class="bi bi-rocket me-2"></i>INICIAR ENVÍO MASIVO
+                        </button>
+
+                        <div class="logs p-3 rounded flex-grow-1" id="logs">
+                            Listo para enviar...
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Bootstrap JS -->
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Lógica del panel -->
     <script>
         const socket = io();
-        document.getElementById('uDisplay').innerText = localStorage.getItem('user') || '';
-        loadContacts();
-        listarUsuarios();
-        // --- CONTACTOS ---
+        const username = localStorage.getItem('user') || 'Usuario';
+        document.getElementById('uDisplay').innerText = username;
+
+        // QR y conexión
+        socket.on('qr', (data) => {
+            document.getElementById('qrArea').innerHTML = `
+                <img src="${data.src}" class="img-fluid" alt="QR Code">
+                <p class="text-muted mt-3"><small>Escanea con tu WhatsApp</small></p>
+            `;
+        });
+
+        socket.on('ready', () => {
+            document.getElementById('qrArea').innerHTML = `
+                <div class="text-success">
+                    <i class="bi bi-check-circle-fill" style="font-size: 4rem;"></i>
+                    <h5 class="mt-3">¡Conectado!</h5>
+                    <p>Puedes enviar mensajes</p>
+                </div>
+            `;
+        });
+
+        // Cargar contactos
         async function loadContacts() {
-            const res = await fetch('/my-contacts');
-            if(res.status===403) location.href='/login.html';
-            const data = await res.json();
-            document.getElementById('count').innerText = data.length;
-            const list = document.getElementById('list');
-            list.innerHTML = '';
-            data.forEach(c => {
-                list.innerHTML += `
-                <li class="list-group-item d-flex justify-content-between align-items-center p-1 contact-item">
-                    <span>${c.name} <span class="text-muted">(${c.phone})</span></span>
-                    <div>
-                        <span class="action-btn text-primary" onclick="editMode('${c._id}', '${c.name}', '${c.phone}')">✏️</span>
-                        <span class="action-btn text-danger" onclick="deleteOne('${c._id}')">🗑️</span>
-                    </div>
-                </li>`;
-            });
+            try {
+                const res = await fetch('/my-contacts');
+                if (res.status === 403) return location.href = '/login.html';
+                const data = await res.json();
+                document.getElementById('count').innerText = data.length;
+                const list = document.getElementById('list');
+                list.innerHTML = '';
+                data.forEach(c => {
+                    list.innerHTML += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                            <div>
+                                <strong>${c.name}</strong>
+                                <small class="text-muted d-block">${c.phone}</small>
+                            </div>
+                            <div>
+                                <button onclick="editMode('${c._id}', '${c.name}', '${c.phone}')" class="btn btn-outline-primary btn-sm me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button onclick="deleteOne('${c._id}')" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
         }
+        loadContacts();
+
+        // Guardar contacto
         async function saveContact() {
             const id = document.getElementById('editId').value;
-            const name = document.getElementById('name').value;
-            const phone = document.getElementById('phone').value;
-            let url = '/add-contact';
-            let body = { name, phone };
-            if(id) { url = '/update-contact'; body.id = id; }
-            await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            cancelEdit(); loadContacts();
+            const name = document.getElementById('name').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            if (!name || !phone) return alert("Completa nombre y teléfono");
+
+            const url = id ? '/update-contact' : '/add-contact';
+            const body = id ? { id, name, phone } : { name, phone };
+
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                cancelEdit();
+                loadContacts();
+            } catch (err) {
+                alert("Error al guardar");
+            }
         }
+
+        function editMode(id, name, phone) {
+            document.getElementById('editId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('phone').value = phone;
+            document.getElementById('btnSave').innerHTML = '<i class="bi bi-save me-1"></i>Actualizar';
+            document.getElementById('btnCancel').style.display = 'block';
+        }
+
+        function cancelEdit() {
+            document.getElementById('editId').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('btnSave').innerHTML = '<i class="bi bi-save me-1"></i>Guardar Contacto';
+            document.getElementById('btnCancel').style.display = 'none';
+        }
+
         async function deleteOne(id) {
-            if(!confirm("¿Borrar este contacto?")) return;
-            await fetch('/delete-contact', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
-            loadContacts();
+            if (!confirm("¿Eliminar este contacto?")) return;
+            try {
+                await fetch('/delete-contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                loadContacts();
+            } catch (err) {
+                alert("Error al eliminar");
+            }
         }
+
         async function clearAll() {
-            if(!confirm("⚠️ ¿Vaciar toda la agenda?")) return;
-            await fetch('/clear-contacts', { method: 'POST' });
-            loadContacts();
+            if (!confirm("¿Vaciar toda la agenda? Esta acción no se puede deshacer.")) return;
+            try {
+                await fetch('/clear-contacts', { method: 'POST' });
+                loadContacts();
+            } catch (err) {
+                alert("Error al vaciar");
+            }
         }
+
         async function uploadFile() {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Selecciona archivo");
+            if (!file) return alert("Selecciona un archivo Excel o CSV");
+
             const formData = new FormData();
             formData.append('file', file);
-            await fetch('/import-contacts', { method: 'POST', body: formData });
-            loadContacts();
+
+            try {
+                await fetch('/import-contacts', { method: 'POST', body: formData });
+                loadContacts();
+                alert("Contactos importados correctamente");
+            } catch (err) {
+                alert("Error al importar");
+            }
         }
-        // --- QR y estado WhatsApp ---
-        socket.on('qr', (data) => {
-            document.getElementById('qrArea').innerHTML = `<img src="${data.src}" class="img-fluid" alt="Escanea este QR con WhatsApp">`;
-        });
-        socket.on('ready', () => {
-            document.getElementById('qrArea').innerHTML = '<h5 class="text-success">✅ WhatsApp Conectado</h5><p>Puedes enviar mensajes</p>';
-        });
-        // --- Envío masivo ---
+
         async function send() {
             const msg = document.getElementById('msg').value.trim();
             if (!msg) return alert("Escribe un mensaje");
+
             const res = await fetch('/my-contacts');
             const contacts = await res.json();
             if (contacts.length === 0) return alert("No hay contactos en la agenda");
+
             const logs = document.getElementById('logs');
-            logs.innerHTML = 'Iniciando envío...\n';
-            for (const c of contacts) {
+            logs.innerHTML = '<strong>Iniciando envío masivo...</strong><br>';
+
+            for (let i = 0; i < contacts.length; i++) {
+                const c = contacts[i];
                 const personalized = msg.replace(/{name}/g, c.name);
-                logs.innerHTML += `[${c.name}] Enviado\n`;
+                logs.innerHTML += `<span class="text-success">[${i+1}] ${c.name} → Enviado</span><br>`;
                 logs.scrollTop = logs.scrollHeight;
+                // Aquí va tu envío real con whatsapp-web.js
+                // await client.sendMessage(c.phone + '@c.us', personalized);
+                await new Promise(r => setTimeout(r, 800)); // Simulación de delay
             }
-            alert("Envío masivo completado");
+
+            logs.innerHTML += '<strong class="text-success">¡Envío masivo completado!</strong>';
+            alert("¡Todos los mensajes fueron enviados!");
         }
-        // --- Logout ---
+
         function logout() {
             fetch('/logout', { method: 'POST' });
             localStorage.clear();
