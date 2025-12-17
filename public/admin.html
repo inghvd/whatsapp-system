@@ -60,7 +60,7 @@
             </div>
         </div>
 
-        <!-- LISTA DE USUARIOS -->
+        <!-- LISTA DE USUARIOS CON BOTÓN ELIMINAR -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-info text-white">Usuarios Registrados</div>
             <div class="card-body">
@@ -69,10 +69,11 @@
                         <tr>
                             <th>Usuario</th>
                             <th>Rol</th>
+                            <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody id="userList">
-                        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
+                        <tr><td colspan="3" class="text-center text-muted">Cargando usuarios...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -121,7 +122,7 @@
         document.getElementById('dateStart').value = today;
         document.getElementById('dateEnd').value = today;
 
-        // Cargar usuarios
+        // Cargar usuarios con botón eliminar
         async function loadUsers() {
             try {
                 const res = await fetch('/admin/get-users');
@@ -130,18 +131,26 @@
                 tbody.innerHTML = '';
                 if (d.success && d.users.length > 0) {
                     d.users.forEach(u => {
-                        tbody.innerHTML += `<tr><td><b>${u.username}</b></td><td>${u.role}</td></tr>`;
+                        const deleteBtn = u.role === 'agent' 
+                            ? `<button onclick="deleteUser('${u.username}')" class="btn btn-danger btn-sm">Eliminar</button>`
+                            : '<span class="text-muted small">Protegido</span>';
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><b>${u.username}</b></td>
+                                <td>${u.role}</td>
+                                <td>${deleteBtn}</td>
+                            </tr>`;
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No hay usuarios</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No hay usuarios</td></tr>';
                 }
             } catch (err) {
-                tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error al cargar</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error al cargar</td></tr>';
             }
         }
         loadUsers();
 
-        // Crear usuario (con rol)
+        // Crear usuario
         async function createUser() {
             const u = document.getElementById('newUser').value.trim();
             const p = document.getElementById('newPass').value;
@@ -180,7 +189,9 @@
                 });
                 const d = await res.json();
                 const msg = document.getElementById('msgChange');
-                msg.innerHTML = d.success ? '<span class="text-success">✅ Contraseña cambiada</span>' : '<span class="text-danger">❌ ' + (d.error || "Error") + '</span>';
+                msg.innerHTML = d.success 
+                    ? '<span class="text-success">✅ Contraseña cambiada correctamente</span>'
+                    : '<span class="text-danger">❌ ' + (d.error || "Error") + '</span>';
                 if (d.success) {
                     document.getElementById('changeUser').value = '';
                     document.getElementById('changePass').value = '';
@@ -190,7 +201,27 @@
             }
         }
 
-        // Reportes (sin cambios)
+        // Eliminar usuario (solo agentes)
+        async function deleteUser(username) {
+            if (!confirm(`¿Estás seguro de eliminar al usuario "${username}"?\nEsta acción no se puede deshacer.`)) return;
+
+            try {
+                const res = await fetch('/admin/delete-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const d = await res.json();
+                alert(d.success ? "✅ " + d.message : "❌ " + (d.error || "Error"));
+                if (d.success) {
+                    loadUsers();
+                }
+            } catch (err) {
+                alert("Error de conexión");
+            }
+        }
+
+        // Reportes
         async function generarReporte() {
             const start = document.getElementById('dateStart').value;
             const end = document.getElementById('dateEnd').value;
