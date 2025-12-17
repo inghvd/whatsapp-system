@@ -11,25 +11,51 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>📊 Panel Gerencial</h2>
             <div>
-                <!-- BOTÓN CORREGIDO: ahora sí funciona siempre -->
                 <button onclick="window.location.href='/panel.html'" class="btn btn-outline-primary me-2">Ir a Operaciones</button>
                 <button onclick="window.location.href='/login.html'" class="btn btn-danger">Salir</button>
             </div>
         </div>
 
-        <!-- CREAR USUARIOS -->
+        <!-- GESTIÓN DE EQUIPO (MEJORADA) -->
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-primary text-white">👥 Gestión de Equipo</div>
-            <div class="card-body d-flex gap-2 align-items-end">
-                <div class="flex-grow-1">
-                    <label class="small">Usuario Nuevo</label>
-                    <input id="newUser" class="form-control" placeholder="Ej: vendedor1">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="small">Usuario Nuevo</label>
+                        <input id="newUser" class="form-control" placeholder="Ej: vendedor1">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small">Contraseña</label>
+                        <input id="newPass" type="password" class="form-control" placeholder="Ej: clave123">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small">Rol</label>
+                        <select id="newRole" class="form-select">
+                            <option value="agent">Agente</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button onclick="createUser()" class="btn btn-success w-100">Crear Usuario</button>
+                    </div>
                 </div>
-                <div class="flex-grow-1">
-                    <label class="small">Contraseña</label>
-                    <input id="newPass" type="password" class="form-control" placeholder="Ej: clave123">
+
+                <!-- CAMBIAR CONTRASEÑA -->
+                <hr class="my-4">
+                <h5 class="text-primary">Cambiar Contraseña</h5>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <input id="changeUser" class="form-control" placeholder="Usuario a modificar">
+                    </div>
+                    <div class="col-md-4">
+                        <input id="changePass" type="password" class="form-control" placeholder="Nueva contraseña">
+                    </div>
+                    <div class="col-md-2">
+                        <button onclick="changePassword()" class="btn btn-warning w-100">Cambiar</button>
+                    </div>
                 </div>
-                <button onclick="createUser()" class="btn btn-success">Crear Usuario</button>
+                <div id="msgChange" class="mt-2 small"></div>
             </div>
         </div>
 
@@ -90,62 +116,86 @@
     </div>
 
     <script>
-        // Fecha por defecto: hoy
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('dateStart').value = today;
         document.getElementById('dateEnd').value = today;
 
-        // Cargar lista de usuarios
+        // Cargar usuarios
         async function loadUsers() {
             try {
                 const res = await fetch('/admin/get-users');
                 const d = await res.json();
                 const tbody = document.getElementById('userList');
                 tbody.innerHTML = '';
-                if (d.success && d.users && d.users.length > 0) {
+                if (d.success && d.users.length > 0) {
                     d.users.forEach(u => {
                         tbody.innerHTML += `<tr><td><b>${u.username}</b></td><td>${u.role}</td></tr>`;
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No hay usuarios registrados</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No hay usuarios</td></tr>';
                 }
             } catch (err) {
-                document.getElementById('userList').innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error al cargar usuarios</td></tr>';
-                console.error(err);
+                document.getElementById('userList').innerHTML = '<tr><td colspan="2">Error al cargar</td></tr>';
             }
         }
         loadUsers();
 
-        // Crear usuario
+        // Crear usuario (con rol)
         async function createUser() {
             const u = document.getElementById('newUser').value.trim();
             const p = document.getElementById('newPass').value;
-            if (!u || !p) return alert("⚠️ Completa usuario y contraseña");
+            const role = document.getElementById('newRole').value;
+            if (!u || !p) return alert("Completa usuario y contraseña");
 
             try {
                 const res = await fetch('/admin/create-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: u, password: p })
+                    body: JSON.stringify({ username: u, password: p, role })
                 });
                 const d = await res.json();
-                alert(d.success ? "✅ " + d.message : "❌ " + (d.error || "Error al crear usuario"));
+                alert(d.success ? "✅ " + d.message : "❌ " + (d.error || "Error"));
                 if (d.success) {
                     document.getElementById('newUser').value = '';
                     document.getElementById('newPass').value = '';
                     loadUsers();
                 }
             } catch (err) {
-                alert("❌ Error de conexión");
-                console.error(err);
+                alert("Error de conexión");
             }
         }
 
-        // Generar reporte
+        // Cambiar contraseña
+        async function changePassword() {
+            const username = document.getElementById('changeUser').value.trim();
+            const newPassword = document.getElementById('changePass').value;
+            if (!username || !newPassword) return alert("Completa ambos campos");
+
+            try {
+                const res = await fetch('/admin/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, newPassword })
+                });
+                const d = await res.json();
+                const msg = document.getElementById('msgChange');
+                if (d.success) {
+                    msg.innerHTML = `<span class="text-success">✅ ${d.message}</span>`;
+                    document.getElementById('changeUser').value = '';
+                    document.getElementById('changePass').value = '';
+                } else {
+                    msg.innerHTML = `<span class="text-danger">❌ ${d.error || "Error"}</span>`;
+                }
+            } catch (err) {
+                document.getElementById('msgChange').innerHTML = '<span class="text-danger">Error de conexión</span>';
+            }
+        }
+
+        // Generar reporte (sin cambios)
         async function generarReporte() {
             const start = document.getElementById('dateStart').value;
             const end = document.getElementById('dateEnd').value;
-            if (!start || !end) return alert("⚠️ Selecciona ambas fechas");
+            if (!start || !end) return alert("Selecciona ambas fechas");
 
             try {
                 const res = await fetch(`/admin/export-logs?start=${start}&end=${end}`);
@@ -170,11 +220,11 @@
                         </tr>`;
                 });
 
-                if (confirm(`✅ ${logs.length} registros encontrados.\n¿Descargar Excel ahora?`)) {
+                if (confirm(`✅ ${logs.length} registros encontrados.\n¿Descargar Excel?`)) {
                     descargarExcel(logs);
                 }
             } catch (err) {
-                alert("❌ Error al cargar reportes");
+                alert("Error al cargar reportes");
                 console.error(err);
             }
         }

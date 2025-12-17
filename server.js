@@ -243,20 +243,23 @@ app.post('/import-contacts', auth, upload.single('file'), async (req, res) => {
   }
 });
 
-// --- RUTAS ADMIN ---
+// --- RUTAS ADMIN (MEJORADAS) ---
 app.post('/admin/create-user', adminAuth, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, role } = req.body; // <-- Ahora recibe role opcional
     if (!username || !password) return res.status(400).json({ error: 'Faltan datos' });
     if (await User.findOne({ username })) return res.status(400).json({ error: 'Usuario ya existe' });
 
+    // Solo el admin puede crear otro admin
+    const newRole = (role === 'admin' && req.session.role === 'admin') ? 'admin' : 'agent';
+
     const hash = bcrypt.hashSync(password, 10);
-    await User.create({ username, password: hash, role: 'agent' });
+    await User.create({ username, password: hash, role: newRole });
 
     await Log.create({
       username: req.session.username,
       type: 'admin',
-      message: `Creó usuario agente: ${username}`
+      message: `Creó usuario ${newRole}: ${username}`
     });
 
     res.json({ success: true, message: 'Usuario creado correctamente' });
@@ -268,7 +271,7 @@ app.post('/admin/create-user', adminAuth, async (req, res) => {
 
 app.get('/admin/get-users', adminAuth, async (req, res) => {
   try {
-    const users = await User.find({}, 'username role -_id');
+    const users = await User.find({}, 'username role -_id').sort({ role: 'desc', username: 1 });
     res.json({ success: true, users });
   } catch (e) {
     res.status(500).json({ error: 'Error' });
@@ -281,7 +284,7 @@ app.post('/admin/delete-user', adminAuth, async (req, res) => {
     if (!username || username === 'admin') return res.status(400).json({ error: 'No permitido' });
 
     const result = await User.deleteOne({ username, role: 'agent' });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'No encontrado' });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'No encontrado o es admin' });
 
     await Log.create({
       username: req.session.username,
@@ -292,6 +295,31 @@ app.post('/admin/delete-user', adminAuth, async (req, res) => {
     res.json({ success: true, message: 'Usuario eliminado' });
   } catch (e) {
     res.status(500).json({ error: 'Error' });
+  }
+});
+
+// NUEVA RUTA: Cambiar contraseña
+app.post('/admin/change-password', adminAuth, async (req, res) => {
+  try {
+    const { username, newPassword } = req.body;
+    if (!username || !newPassword) return res.status(400).json({ error: 'Faltan datos' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Mínimo 6 caracteres' });
+
+    const hash = bcrypt.hashSync(newPassword, 10);
+    const result = await User.updateOne({ username }, { password: hash });
+
+    if (result.modifiedCount === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    await Log.create({
+      username: req.session.username,
+      type: 'admin',
+      message: `Cambió contraseña de: ${username}`
+    });
+
+    res.json({ success: true, message: 'Contraseña cambiada correctamente' });
+  } catch (e) {
+    console.error('Error change-password:', e);
+    res.status(500).json({ error: 'Error interno' });
   }
 });
 
