@@ -1,36 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Login WhatsApp</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso - WhatsApp System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #075e54, #128c7e); /* Verde WhatsApp */
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .logo {
+            font-size: 3rem;
+            color: #075e54;
+        }
+        .btn-login {
+            background: #075e54;
+            border: none;
+        }
+        .btn-login:hover {
+            background: #064439;
+        }
+    </style>
 </head>
-<body class="bg-dark d-flex justify-content-center align-items-center" style="height: 100vh;">
-    <div class="card p-4" style="width: 350px;">
-        <h3 class="text-center mb-3">🔐 Acceso</h3>
-        <input id="user" class="form-control mb-2" placeholder="Usuario">
-        <input id="pass" type="password" class="form-control mb-3" placeholder="Contraseña">
-        <button onclick="login()" class="btn btn-primary w-100">Ingresar</button>
+<body>
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <i class="bi bi-whatsapp logo"></i>
+            <h3 class="mt-3">Acceso al Sistema</h3>
+            <p class="text-muted">Ingresa tus credenciales</p>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label">Usuario</label>
+                <input type="text" id="username" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-success btn-login w-100">Ingresar</button>
+        </form>
     </div>
 
     <script>
-        async function login() {
-            const u = document.getElementById('user').value;
-            const p = document.getElementById('pass').value;
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: u, password: p })
-            });
-            const data = await res.json();
-            if (data.role) {
-                localStorage.setItem('user', data.username);
-                localStorage.setItem('role', data.role);
-                window.location.href = data.role === 'admin' ? '/admin.html' : '/panel.html';
-            } else {
-                alert("Error: " + data.error);
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            if (!username || !password) return alert("Completa usuario y contraseña");
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const d = await res.json();
+                if (d.role) {
+                    localStorage.setItem('user', d.username);
+                    localStorage.setItem('role', d.role);
+                    location.href = d.role === 'admin' ? '/admin.html' : '/panel.html';
+                } else {
+                    alert("❌ " + (d.error || "Credenciales incorrectas"));
+                }
+            } catch (err) {
+                alert("Error de conexión");
             }
-        }
+        });
     </script>
 </body>
 </html>
-
