@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "Sistema WhatsApp con Node.js y whatsapp-web.js",
   "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "bcryptjs": "^3.0.3",
     "connect-mongo": "^4.6.0",
     "dotenv": "^17.2.3",
@@ -19,10 +20,10 @@
     "express-session": "^1.18.2",
     "mongoose": "^9.0.1",
     "multer": "^2.0.2",
+    "pino": "^10.1.0",
     "pm2": "^6.0.13",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.1",
-    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#main",
     "xlsx": "^0.18.5"
   }
 }
