@@ -94,7 +94,7 @@ app.use(session({
 }));
 console.log('🔐 SessionStore configurado');
 
-// --- 10) WhatsApp Client con Baileys (sin puppeteer) ---
+// --- 10) WhatsApp Client con Baileys ---
 let sock = null;
 
 async function connectToWhatsApp() {
@@ -136,7 +136,7 @@ async function connectToWhatsApp() {
 
 connectToWhatsApp();
 
-// --- Función para enviar mensaje (usada en envío masivo) ---
+// --- Función para enviar mensaje (para envío masivo) ---
 async function sendMessage(phone, message) {
   if (!sock) return false;
   try {
@@ -149,7 +149,7 @@ async function sendMessage(phone, message) {
   }
 }
 
-// --- 11) Login/Logout ---
+// --- 11) Login/Logout y rutas ---
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
@@ -180,7 +180,7 @@ const adminAuth = (req, res, next) => {
   next();
 };
 
-// --- RUTAS DE CONTACTOS PARA AGENTES ---
+// --- RUTAS DE CONTACTOS ---
 app.get('/my-contacts', auth, async (req, res) => {
   try {
     const contacts = await Contact.find({ userId: req.session.userId }).sort({ name: 1 });
@@ -337,7 +337,6 @@ app.post('/admin/change-password', adminAuth, async (req, res) => {
   }
 });
 
-// --- REPORTE ---
 app.get('/admin/export-logs', adminAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
